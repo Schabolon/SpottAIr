@@ -526,71 +526,80 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'squats', targ
                 </div>
 
                 {/* Feedback Panel */}
-                <div className={`flex-1 backdrop-blur-sm rounded-3xl border shadow-sm p-6 flex flex-col transition-colors duration-300 ${currentFeedbackClass === 'not_visible' ? 'bg-yellow-500/10 border-yellow-500/50' : currentFeedbackClass !== 'correct' ? 'bg-red-500/10 border-red-500/50' : 'bg-card/50 border-border'}`}>
-                    <h2 className="text-base font-semibold mb-4 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-purple-500 fill-purple-500/20" />
-                            <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                                Real-time AI Analysis
-                            </span>
-                        </div>
-                        {debugInfo && (
-                            <div className="text-[10px] font-mono text-muted-foreground opacity-50">
-                                {debugInfo.class}: {(debugInfo.confidence * 100).toFixed(0)}%
-                            </div>
-                        )}
-                    </h2>
+                <FeedbackPanel
+                    currentFeedbackClass={currentFeedbackClass}
+                    ruleFeedback={poseState.feedback}
+                    isExerciseActive={isExerciseActive}
+                    debugInfo={debugInfo}
+                />
+            </div>
+        </div>
+    );
+};
 
-                    <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar flex flex-col items-center justify-center">
-                        {currentFeedbackClass === 'correct' ? (
-                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50 gap-4">
-                                {isExerciseActive ? (
-                                    <>
-                                        <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center animate-pulse">
-                                            <span className="text-3xl">✨</span>
-                                        </div>
-                                        <p className="text-center font-medium text-green-500">Perfect Form!</p>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="w-16 h-16 rounded-full bg-purple-500/10 flex items-center justify-center">
-                                            <Sparkles className="w-8 h-8 text-purple-500" />
-                                        </div>
-                                        <p className="text-center">Start exercise to<br />receive feedback</p>
-                                    </>
-                                )}
-                            </div>
-                        ) : currentFeedbackClass === 'not_visible' ? (
-                            <div className="flex flex-col items-center gap-4 animate-in zoom-in duration-300">
-                                <div className="w-20 h-20 rounded-full bg-yellow-500/20 flex items-center justify-center border-2 border-yellow-500 animate-pulse">
-                                    <span className="text-4xl">📷</span>
-                                </div>
-                                <div className="text-center">
-                                    <h3 className="text-xl font-bold text-yellow-500 mb-1">Visibility Issue</h3>
-                                    <p className="text-yellow-400 font-medium">
-                                        Ensure full body is visible
-                                    </p>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center gap-4 animate-in zoom-in duration-300">
-                                <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center border-2 border-red-500 animate-bounce">
-                                    <span className="text-4xl">
-                                        {currentFeedbackClass === 'feet_wide' && '↔️'}
-                                        {currentFeedbackClass === 'knees_caved' && '🦵'}
-                                        {currentFeedbackClass === 'spine_misalignment' && '🦴'}
-                                    </span>
-                                </div>
-                                <div className="text-center">
-                                    <h3 className="text-xl font-bold text-red-500 mb-1">Correction Needed</h3>
-                                    <p className="text-red-400 font-medium">
-                                        {currentFeedbackClass === 'feet_wide' && 'Feet too wide'}
-                                        {currentFeedbackClass === 'knees_caved' && 'Knees caving in'}
-                                        {currentFeedbackClass === 'spine_misalignment' && 'Spine misaligned'}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
+import { FeedbackService } from '../lib/services/feedback';
+
+const FeedbackPanel = ({ currentFeedbackClass, ruleFeedback, isExerciseActive, debugInfo }: any) => {
+    // Determine visibility based on class (simplified for now, as logic is inside Service too)
+    const isVisible = currentFeedbackClass !== 'not_visible';
+
+    const feedback = FeedbackService.getFeedback(
+        currentFeedbackClass,
+        ruleFeedback,
+        isVisible,
+        isExerciseActive
+    );
+
+    // Styles based on type
+    const styles = {
+        success: 'bg-card/50 border-border',
+        warning: 'bg-yellow-500/10 border-yellow-500/50',
+        error: 'bg-red-500/10 border-red-500/50',
+        info: 'bg-card/50 border-border'
+    };
+
+    const textColors = {
+        success: 'text-green-500',
+        warning: 'text-yellow-500',
+        error: 'text-red-500',
+        info: 'text-foreground'
+    };
+
+    const bgColors = {
+        success: 'bg-green-500/10',
+        warning: 'bg-yellow-500/20',
+        error: 'bg-red-500/20',
+        info: 'bg-purple-500/10'
+    };
+
+    return (
+        <div className={`flex-1 backdrop-blur-sm rounded-3xl border shadow-sm p-6 flex flex-col transition-colors duration-300 ${styles[feedback.type]}`}>
+            <h2 className="text-base font-semibold mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-500 fill-purple-500/20" />
+                    <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                        Real-time AI Analysis
+                    </span>
+                </div>
+                {debugInfo && (
+                    <div className="text-[10px] font-mono text-muted-foreground opacity-50">
+                        {debugInfo.class}: {(debugInfo.confidence * 100).toFixed(0)}%
+                    </div>
+                )}
+            </h2>
+
+            <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar flex flex-col items-center justify-center">
+                <div className="flex flex-col items-center gap-4 animate-in zoom-in duration-300">
+                    <div className={`w-20 h-20 rounded-full flex items-center justify-center border-2 ${(feedback.type === 'warning' || feedback.type === 'error') ? 'animate-bounce border-current' : 'animate-pulse border-transparent'} ${bgColors[feedback.type]} ${textColors[feedback.type]}`}>
+                        <span className="text-4xl">
+                            {feedback.type === 'info' ? <Sparkles className="w-8 h-8 text-purple-500" /> : feedback.icon}
+                        </span>
+                    </div>
+                    <div className="text-center">
+                        {feedback.title && <h3 className={`text-xl font-bold mb-1 ${textColors[feedback.type]}`}>{feedback.title}</h3>}
+                        <p className={`font-medium ${feedback.type === 'success' ? 'text-green-500' : 'text-muted-foreground'}`}>
+                            {feedback.message}
+                        </p>
                     </div>
                 </div>
             </div>
