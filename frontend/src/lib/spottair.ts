@@ -13,7 +13,7 @@ interface SpottairModelHook {
   model: tf.GraphModel | null;
   isLoading: boolean;
   error: string | null;
-  runInference: (landmarks: Landmark[]) => Promise<number[] | null>;
+  runInference: (landmarks: Landmark[]) => number[] | null;
 }
 
 /**
@@ -58,14 +58,17 @@ export function normalizePose(landmarks: Landmark[]): number[] {
  * @param landmarks - Array of pose landmarks with x, y, z coordinates
  * @returns Model output or null if inference fails
  */
-export async function inferPoseModel(
+export function inferPoseModel(
   model: tf.GraphModel | tf.LayersModel,
   landmarks: Landmark[]
-): Promise<number[] | null> {
+): number[] | null {
   if (!model) {
     console.error('Model not provided');
     return null;
   }
+
+  let inputTensor: tf.Tensor | undefined;
+  let outputTensor: tf.Tensor | undefined;
 
   try {
     // Preprocess the landmarks
@@ -74,25 +77,25 @@ export async function inferPoseModel(
     console.log('Normalized input data (length: ' + normalizedData.length + '):', normalizedData);
 
     // Create input tensor - shape [1, 48] for batch size 1 with 48 features
-    const inputTensor = tf.tensor2d([normalizedData], [1, 48]);
+    inputTensor = tf.tensor2d([normalizedData], [1, 48]);
 
-    // Run inference
-    const outputTensor = model.predict(inputTensor) as tf.Tensor;
+    // Run inference SYNCHRONOUSLY
+    outputTensor = model.predict(inputTensor) as tf.Tensor;
 
-    // Get output data
-    const outputData = await outputTensor.data();
+    // Get output data SYNCHRONOUSLY
+    const outputData = outputTensor.dataSync(); // ✅ Changed from .data() to .dataSync()
     const output = Array.from(outputData);
 
     console.log('Model output:', output);
-
-    // Cleanup tensors
-    inputTensor.dispose();
-    outputTensor.dispose();
 
     return output;
   } catch (err) {
     console.error('Error running inference:', err);
     return null;
+  } finally {
+    // ✅ Always cleanup tensors to prevent memory leaks
+    if (inputTensor) inputTensor.dispose();
+    if (outputTensor) outputTensor.dispose();
   }
 }
 
@@ -165,7 +168,7 @@ export function useSpottair(
    * @param landmarks - Array of pose landmarks with x, y, z coordinates
    * @returns Model output or null if inference fails
    */
-  const runInference = async (landmarks: Landmark[]): Promise<number[] | null> => {
+  const runInference = (landmarks: Landmark[]): Promise<number[] | null> => {
     if (!model) {
       console.error('Model not loaded yet');
       return null;

@@ -171,13 +171,13 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
         }
     };
 
-    const onResults = async (results: Results) => {
+    const onResults = (results: Results) => {
         if (!canvasRef.current || !webcamRef.current || !webcamRef.current.video) return;
 
         // ✅ Check if we have landmarks AND model is ready before running inference
         if (results.poseLandmarks && model && !isLoading) {
           try {
-            const output = await runInference(results.poseLandmarks);
+            const output = runInference(results.poseLandmarks);
             if (output) {
               console.log('SpottAIr Output:', output);
               // TODO: Use the output for exercise classification or feedback
