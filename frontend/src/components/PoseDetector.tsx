@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
+import { Sparkles } from 'lucide-react';
 import { Pose, POSE_CONNECTIONS, type Results } from '@mediapipe/pose';
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { getProcessor } from '../lib/exercises/registry';
@@ -223,32 +224,31 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
     }, []);
 
     return (
-        <div className="flex flex-col lg:flex-row gap-6 h-full p-6 bg-black/5">
+        <div className="flex flex-col lg:flex-row gap-6 h-full pt-6">
             {/* Camera View */}
             <div className="relative flex-1 bg-black rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 group">
                 <Webcam
                     ref={webcamRef}
-                    className="absolute inset-0 w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-cover scale-x-[-1]"
                 />
                 <canvas
                     ref={canvasRef}
-                    className="absolute inset-0 w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-cover scale-x-[-1]"
                 />
 
-                {/* Countdown Overlay */}
                 {isCountingDown && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-20 backdrop-blur-sm">
-                        <div className="text-[12rem] font-black text-white animate-in zoom-in duration-300 drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-20 backdrop-blur-sm">
+                        <div className="text-8xl font-light text-white animate-in zoom-in duration-300 drop-shadow-lg">
                             {countdownValue}
                         </div>
                     </div>
                 )}
 
                 {/* Floating Controls */}
-                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
                     <button
                         onClick={startExercise}
-                        className={`flex items-center gap-3 px-8 py-4 rounded-full font-bold text-lg shadow-2xl transition-all transform hover:scale-105 backdrop-blur-md ${isExerciseActive || isCountingDown
+                        className={`flex items-center gap-3 px-6 py-3 rounded-full font-medium text-base shadow-lg transition-all transform hover:scale-105 backdrop-blur-md ${isExerciseActive || isCountingDown
                             ? 'bg-red-500/90 hover:bg-red-600 text-white shadow-red-500/20'
                             : 'bg-white/90 hover:bg-white text-black shadow-white/20'
                             }`}
@@ -272,60 +272,56 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
                     </button>
                 </div>
 
-                {/* Status Badge */}
+                {/* Status Badge - Minimal */}
                 <div className="absolute top-6 left-6 z-10">
-                    <div className={`px-4 py-2 rounded-full backdrop-blur-md border border-white/10 flex items-center gap-2 ${isExerciseActive
-                        ? 'bg-green-500/20 text-green-400'
-                        : 'bg-black/40 text-white/60'
-                        }`}>
-                        <div className={`w-2 h-2 rounded-full ${isExerciseActive ? 'bg-green-500 animate-pulse' : 'bg-white/40'}`} />
-                        <span className="text-sm font-medium uppercase tracking-wider">
-                            {isExerciseActive ? 'Live Analysis' : 'Camera Ready'}
-                        </span>
-                    </div>
+                    {isExerciseActive && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/20 backdrop-blur-md border border-white/10">
+                            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                            <span className="text-xs font-medium text-white/80 uppercase tracking-wider">REC</span>
+                        </div>
+                    )}
                 </div>
             </div>
 
             {/* Sidebar Stats */}
-            <div className="w-full lg:w-[400px] flex flex-col gap-4">
+            <div className="w-full lg:w-[320px] flex flex-col gap-4">
                 {/* Rep Counter */}
-                <div className={`relative overflow-hidden p-8 rounded-3xl shadow-lg border transition-all duration-500 ${exerciseState.isGoodRep
-                    ? 'bg-gradient-to-br from-green-500/10 to-emerald-500/5 border-green-500/20'
-                    : 'bg-gradient-to-br from-yellow-500/10 to-orange-500/5 border-yellow-500/20'
-                    }`}>
-                    <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Current Reps</h2>
+                <div className="relative overflow-hidden p-6 rounded-3xl shadow-sm border bg-card text-card-foreground">
+                    <h2 className="text-base font-semibold mb-2 flex items-center gap-2">Current Reps</h2>
                     <div className="flex items-baseline gap-2">
-                        <span className={`text-8xl font-black tracking-tighter ${exerciseState.isGoodRep ? 'text-green-500' : 'text-yellow-500'
-                            }`}>
+                        <span className="text-7xl font-bold tracking-tight">
                             {exerciseState.reps}
                         </span>
-                        <span className="text-3xl font-medium text-muted-foreground">/ {targetReps}</span>
+                        <span className="text-2xl font-light text-muted-foreground">/ {targetReps}</span>
                     </div>
 
                     {/* Progress Bar */}
-                    <div className="absolute bottom-0 left-0 w-full h-1.5 bg-muted/30">
+                    <div className="absolute bottom-0 left-0 w-full h-1 bg-muted">
                         <div
-                            className={`h-full transition-all duration-500 ${exerciseState.isGoodRep ? 'bg-green-500' : 'bg-yellow-500'}`}
+                            className="h-full transition-all duration-500 bg-primary"
                             style={{ width: `${Math.min((exerciseState.reps / targetReps) * 100, 100)}%` }}
                         />
                     </div>
                     {exerciseState.reps > 0 && (
-                        <div className="mt-2 text-center text-gray-700 dark:text-gray-200 font-bold text-xl">
-                            Last Rep: {exerciseState.lastRepDuration?.toFixed(1) || '0.0'}s
+                        <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                            <span className="font-medium text-foreground">Last Rep:</span> {exerciseState.lastRepDuration?.toFixed(1) || '0.0'}s
                         </div>
                     )}
                 </div>
 
                 {/* Feedback Panel */}
                 <div className="flex-1 bg-card/50 backdrop-blur-sm rounded-3xl border shadow-sm p-6 flex flex-col">
-                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        Real-time Feedback
+                    <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-purple-500 fill-purple-500/20" />
+                        <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                            Real-time AI Analysis
+                        </span>
                     </h2>
 
                     <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
                         {exerciseState.feedback.length > 0 ? (
                             exerciseState.feedback.map((msg, i) => (
-                                <div key={i} className="flex items-start gap-3 p-4 rounded-2xl bg-red-500/5 border border-red-500/10 text-red-600 dark:text-red-400 animate-in slide-in-from-right-4 duration-300">
+                                <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-red-500/5 border border-red-500/10 text-red-600 dark:text-red-400 animate-in slide-in-from-right-4 duration-300">
                                     <span className="text-xl mt-0.5">⚠️</span>
                                     <p className="font-medium leading-snug">{msg}</p>
                                 </div>
@@ -341,8 +337,8 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
                                     </>
                                 ) : (
                                     <>
-                                        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                                            <span className="text-3xl">📷</span>
+                                        <div className="w-16 h-16 rounded-full bg-purple-500/10 flex items-center justify-center">
+                                            <Sparkles className="w-8 h-8 text-purple-500" />
                                         </div>
                                         <p className="text-center">Start exercise to<br />receive feedback</p>
                                     </>

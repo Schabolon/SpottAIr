@@ -26,8 +26,8 @@ const Layout: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2 bg-orange-500/10 text-orange-500 px-3 py-1 rounded-full text-sm font-medium">
-                            <Flame className="w-4 h-4 fill-orange-500" />
+                        <div className="flex items-center gap-2 text-muted-foreground px-3 py-1 rounded-full text-sm font-medium border border-border/50">
+                            <Flame className="w-4 h-4" />
                             <span>12 Day Streak</span>
                         </div>
 

@@ -22,22 +22,32 @@ const ExerciseDetail: React.FC = () => {
     return (
         <div className="h-[calc(100vh-10rem)] flex flex-col">
             <Tabs defaultValue="train" className="flex-1 flex flex-col min-h-0">
-                <div className="flex items-center justify-between mb-4 shrink-0">
+                <div className="flex items-center justify-between mb-6 pb-4 border-b shrink-0">
                     <div className="flex items-center gap-4">
                         <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="rounded-full">
                             <ArrowLeft className="h-6 w-6" />
                         </Button>
-                        <h1 className="text-3xl font-bold tracking-tight">{exerciseTitle}</h1>
+                        <h1 className="text-2xl font-semibold tracking-tight">{exerciseTitle}</h1>
                     </div>
 
-                    <TabsList className="grid w-[300px] grid-cols-2 h-10 bg-muted/50 p-1 rounded-lg">
-                        <TabsTrigger value="train" className="text-xs font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md transition-all">Training</TabsTrigger>
-                        <TabsTrigger value="analyze" className="text-xs font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md transition-all">Analysis</TabsTrigger>
+                    <TabsList className="flex gap-6 bg-transparent p-0 h-auto">
+                        <TabsTrigger
+                            value="train"
+                            className="rounded-none border-b-2 border-transparent px-0 py-2 text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none transition-all hover:text-foreground"
+                        >
+                            Training
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="analyze"
+                            className="rounded-none border-b-2 border-transparent px-0 py-2 text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none transition-all hover:text-foreground"
+                        >
+                            Analysis
+                        </TabsTrigger>
                     </TabsList>
                 </div>
 
                 <TabsContent value="train" className="flex-1 min-h-0 mt-0 animate-in fade-in-50 slide-in-from-bottom-4 duration-500">
-                    <div className="h-full bg-card rounded-3xl border shadow-sm overflow-hidden">
+                    <div className="h-full overflow-hidden">
                         <PoseDetector
                             exerciseId={id || 'unknown'}
                             onRecordingComplete={handleRecordingComplete}
