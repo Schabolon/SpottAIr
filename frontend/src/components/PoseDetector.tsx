@@ -222,82 +222,128 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
     }, []);
 
     return (
-        <div className="relative flex flex-row items-start justify-center p-6 bg-black/5 min-h-[600px] gap-6">
-
+        <div className="flex flex-col lg:flex-row gap-6 h-full p-6 bg-black/5">
             {/* Camera View */}
-            <div className="relative flex flex-col items-center">
-                <div className="relative w-[640px] h-[480px] bg-black rounded-lg overflow-hidden shadow-2xl ring-1 ring-white/10">
-                    <Webcam
-                        ref={webcamRef}
-                        className="absolute top-0 left-0 w-full h-full object-cover"
-                    />
-                    <canvas
-                        ref={canvasRef}
-                        className="absolute top-0 left-0 w-full h-full object-cover"
-                    />
+            <div className="relative flex-1 bg-black rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 group">
+                <Webcam
+                    ref={webcamRef}
+                    className="absolute inset-0 w-full h-full object-cover"
+                />
+                <canvas
+                    ref={canvasRef}
+                    className="absolute inset-0 w-full h-full object-cover"
+                />
 
-                    {/* Countdown Overlay */}
-                    {isCountingDown && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-20 backdrop-blur-sm">
-                            <div className="text-9xl font-black text-white animate-bounce drop-shadow-[0_5px_5px_rgba(0,0,0,0.5)]">
-                                {countdownValue}
-                            </div>
+                {/* Countdown Overlay */}
+                {isCountingDown && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-20 backdrop-blur-sm">
+                        <div className="text-[12rem] font-black text-white animate-in zoom-in duration-300 drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]">
+                            {countdownValue}
                         </div>
-                    )}
-                </div>
+                    </div>
+                )}
 
-                <div className="mt-8 z-10">
+                {/* Floating Controls */}
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <button
                         onClick={startExercise}
-                        className={`px-8 py-4 rounded-full font-bold text-lg transition-all transform hover:scale-105 shadow-lg ${isExerciseActive || isCountingDown
-                            ? 'bg-red-500 hover:bg-red-600 text-white ring-4 ring-red-500/30'
-                            : 'bg-green-500 hover:bg-green-600 text-white ring-4 ring-green-500/30'
+                        className={`flex items-center gap-3 px-8 py-4 rounded-full font-bold text-lg shadow-2xl transition-all transform hover:scale-105 backdrop-blur-md ${isExerciseActive || isCountingDown
+                            ? 'bg-red-500/90 hover:bg-red-600 text-white shadow-red-500/20'
+                            : 'bg-white/90 hover:bg-white text-black shadow-white/20'
                             }`}
                     >
-                        {isExerciseActive ? 'Stop Exercise' : (isCountingDown ? 'Get Ready...' : 'Start Exercise')}
+                        {isExerciseActive ? (
+                            <>
+                                <span className="w-4 h-4 bg-current rounded-sm" />
+                                Stop Session
+                            </>
+                        ) : isCountingDown ? (
+                            <>
+                                <span className="animate-spin text-2xl">⏳</span>
+                                Get Ready...
+                            </>
+                        ) : (
+                            <>
+                                <span className="w-0 h-0 border-t-[8px] border-t-transparent border-l-[14px] border-l-current border-b-[8px] border-b-transparent ml-1" />
+                                Start Exercise
+                            </>
+                        )}
                     </button>
+                </div>
+
+                {/* Status Badge */}
+                <div className="absolute top-6 left-6 z-10">
+                    <div className={`px-4 py-2 rounded-full backdrop-blur-md border border-white/10 flex items-center gap-2 ${isExerciseActive
+                        ? 'bg-green-500/20 text-green-400'
+                        : 'bg-black/40 text-white/60'
+                        }`}>
+                        <div className={`w-2 h-2 rounded-full ${isExerciseActive ? 'bg-green-500 animate-pulse' : 'bg-white/40'}`} />
+                        <span className="text-sm font-medium uppercase tracking-wider">
+                            {isExerciseActive ? 'Live Analysis' : 'Camera Ready'}
+                        </span>
+                    </div>
                 </div>
             </div>
 
-            {/* Stats Panel */}
-            <div className="w-[300px] flex flex-col gap-4">
+            {/* Sidebar Stats */}
+            <div className="w-full lg:w-[400px] flex flex-col gap-4">
                 {/* Rep Counter */}
-                <div className={`p-6 rounded-2xl shadow-xl transition-colors duration-300 ${exerciseState.isGoodRep ? 'bg-green-100 dark:bg-green-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'
+                <div className={`relative overflow-hidden p-8 rounded-3xl shadow-lg border transition-all duration-500 ${exerciseState.isGoodRep
+                    ? 'bg-gradient-to-br from-green-500/10 to-emerald-500/5 border-green-500/20'
+                    : 'bg-gradient-to-br from-yellow-500/10 to-orange-500/5 border-yellow-500/20'
                     }`}>
-                    <h2 className="text-xl font-semibold text-gray-600 dark:text-gray-300 mb-2">Reps</h2>
-                    <div className={`text-8xl font-black ${exerciseState.isGoodRep ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'
-                        }`}>
-                        {exerciseState.reps} <span className="text-4xl text-gray-400">/ {targetReps}</span>
+                    <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Current Reps</h2>
+                    <div className="flex items-baseline gap-2">
+                        <span className={`text-8xl font-black tracking-tighter ${exerciseState.isGoodRep ? 'text-green-500' : 'text-yellow-500'
+                            }`}>
+                            {exerciseState.reps}
+                        </span>
+                        <span className="text-3xl font-medium text-muted-foreground">/ {targetReps}</span>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="absolute bottom-0 left-0 w-full h-1.5 bg-muted/30">
+                        <div
+                            className={`h-full transition-all duration-500 ${exerciseState.isGoodRep ? 'bg-green-500' : 'bg-yellow-500'}`}
+                            style={{ width: `${Math.min((exerciseState.reps / targetReps) * 100, 100)}%` }}
+                        />
                     </div>
                 </div>
 
-                {/* Feedback */}
-                <div className="p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-xl flex-grow">
-                    <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Feedback</h2>
-                    {exerciseState.feedback.length > 0 ? (
-                        <ul className="space-y-2">
-                            {exerciseState.feedback.map((msg, i) => (
-                                <li key={i} className="flex items-center gap-2 text-red-500 font-medium animate-pulse">
-                                    <span className="text-2xl">⚠</span>
-                                    {msg}
-                                </li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                            {isExerciseActive ? (
-                                <>
-                                    <span className="text-4xl mb-2">✓</span>
-                                    <p>Good Form</p>
-                                </>
-                            ) : (
-                                <>
-                                    <span className="text-4xl mb-2">⏳</span>
-                                    <p className="text-center">Waiting for training<br />to start...</p>
-                                </>
-                            )}
-                        </div>
-                    )}
+                {/* Feedback Panel */}
+                <div className="flex-1 bg-card/50 backdrop-blur-sm rounded-3xl border shadow-sm p-6 flex flex-col">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                        Real-time Feedback
+                    </h2>
+
+                    <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+                        {exerciseState.feedback.length > 0 ? (
+                            exerciseState.feedback.map((msg, i) => (
+                                <div key={i} className="flex items-start gap-3 p-4 rounded-2xl bg-red-500/5 border border-red-500/10 text-red-600 dark:text-red-400 animate-in slide-in-from-right-4 duration-300">
+                                    <span className="text-xl mt-0.5">⚠️</span>
+                                    <p className="font-medium leading-snug">{msg}</p>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50 gap-4">
+                                {isExerciseActive ? (
+                                    <>
+                                        <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center">
+                                            <span className="text-3xl">✨</span>
+                                        </div>
+                                        <p className="text-center font-medium">Perfect Form!</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                                            <span className="text-3xl">📷</span>
+                                        </div>
+                                        <p className="text-center">Start exercise to<br />receive feedback</p>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

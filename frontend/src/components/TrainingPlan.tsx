@@ -2,18 +2,18 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Dumbbell, Activity, Bell, Flame, Settings, User, LogOut, ChevronRight, PlayCircle } from 'lucide-react';
-import { ModeToggle } from "@/components/mode-toggle";
+    Dumbbell, Activity, ChevronRight, PlayCircle, Trophy
+} from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 
 // Mock data for 5-day split
 const trainingSplit = {
@@ -34,7 +34,7 @@ const trainingSplit = {
         title: "Pull Day",
         focus: "Back, Biceps",
         exercises: [
-            { id: 'deadlift', title: 'Deadlift', sets: '3', reps: '5', muscle: 'Back', image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80' },
+            { id: 'deadlift', title: 'Deadlift', sets: '3', reps: '5', muscle: 'Back', image: 'https://images.unsplash.com/photo-1603287681836-b174ce5074c2?w=800&q=80' },
             { id: 'pullups', title: 'Pullups', sets: '3', reps: '8-10', muscle: 'Back', image: 'https://images.unsplash.com/photo-1598971639058-9b196b22cdd8?w=800&q=80' },
             { id: 'rows', title: 'Barbell Rows', sets: '3', reps: '8-10', muscle: 'Back', image: 'https://images.unsplash.com/photo-1603287681836-b174ce5074c2?w=800&q=80' },
             { id: 'lat-pulldown', title: 'Lat Pulldowns', sets: '3', reps: '10-12', muscle: 'Back', image: 'https://images.unsplash.com/photo-1603287681836-b174ce5074c2?w=800&q=80' },
@@ -47,7 +47,7 @@ const trainingSplit = {
         title: "Leg Day",
         focus: "Quads, Hamstrings, Glutes",
         exercises: [
-            { id: 'squats', title: 'Barbell Squats', sets: '4', reps: '6-8', muscle: 'Quads', image: '/squats.png' },
+            { id: 'squats', title: 'Barbell Squats', sets: '4', reps: '6-8', muscle: 'Quads', image: 'https://images.unsplash.com/photo-1574680096141-1cddd32e0340?w=800&q=80' },
             { id: 'rdl', title: 'Romanian Deadlifts', sets: '3', reps: '8-10', muscle: 'Hamstrings', image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80' },
             { id: 'leg-press', title: 'Leg Press', sets: '3', reps: '10-12', muscle: 'Legs', image: 'https://images.unsplash.com/photo-1574680096141-1cddd32e0340?w=800&q=80' },
             { id: 'lunges', title: 'Walking Lunges', sets: '3', reps: '12 each', muscle: 'Glutes', image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80' },
@@ -73,7 +73,7 @@ const trainingSplit = {
         title: "Lower Body",
         focus: "Legs & Core Strength",
         exercises: [
-            { id: 'front-squat', title: 'Front Squats', sets: '3', reps: '8-10', muscle: 'Quads', image: '/squats.png' },
+            { id: 'front-squat', title: 'Front Squats', sets: '3', reps: '8-10', muscle: 'Quads', image: 'https://images.unsplash.com/photo-1574680096141-1cddd32e0340?w=800&q=80' },
             { id: 'rdl-db', title: 'Dumbbell RDLs', sets: '3', reps: '10-12', muscle: 'Hamstrings', image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80' },
             { id: 'bulgarian-split-squat', title: 'Bulgarian Split Squats', sets: '3', reps: '10 each', muscle: 'Legs', image: 'https://images.unsplash.com/photo-1574680096141-1cddd32e0340?w=800&q=80' },
             { id: 'hip-thrust', title: 'Hip Thrusts', sets: '3', reps: '10-12', muscle: 'Glutes', image: 'https://images.unsplash.com/photo-1574680096141-1cddd32e0340?w=800&q=80' },
@@ -88,126 +88,91 @@ const TrainingPlan: React.FC = () => {
     const navigate = useNavigate();
 
     return (
-        <div className="min-h-screen bg-background p-8">
-            <div className="max-w-6xl mx-auto">
-                <header className="flex justify-between items-center mb-12">
-                    <div>
-                        <h1 className="text-4xl font-bold tracking-tight mb-2 flex items-center gap-2">
-                            <Dumbbell className="w-10 h-10 text-primary" />
-                            SpottAIr
-                        </h1>
-                        <p className="text-muted-foreground text-lg">Ready to crush your goals today?</p>
-                    </div>
+        <div className="w-full">
+            <Tabs defaultValue="push" className="w-full space-y-8">
+                <TabsList className="grid w-full grid-cols-5 h-12 bg-muted/50 p-1 rounded-lg">
+                    <TabsTrigger value="push" className="text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md transition-all">Push</TabsTrigger>
+                    <TabsTrigger value="pull" className="text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md transition-all">Pull</TabsTrigger>
+                    <TabsTrigger value="legs" className="text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md transition-all">Legs</TabsTrigger>
+                    <TabsTrigger value="upper" className="text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md transition-all">Upper</TabsTrigger>
+                    <TabsTrigger value="lower" className="text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md transition-all">Lower</TabsTrigger>
+                </TabsList>
 
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2 bg-orange-500/10 text-orange-500 px-4 py-2 rounded-full font-medium">
-                            <Flame className="w-5 h-5 fill-orange-500" />
-                            <span>12 Day Streak</span>
+                {Object.entries(trainingSplit).map(([key, session]) => (
+                    <TabsContent key={key} value={key} className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-4 duration-500">
+                        <div className="flex justify-between items-end mb-8">
+                            <div>
+                                <h2 className="text-3xl font-bold tracking-tight mb-2">{session.title}</h2>
+                                <p className="text-muted-foreground text-lg flex items-center gap-2">
+                                    <Trophy className="w-5 h-5 text-yellow-500" />
+                                    Focus: {session.focus}
+                                </p>
+                            </div>
+                            <Button size="lg" className="gap-2 rounded-full px-8">
+                                Start Session <PlayCircle className="w-5 h-5" />
+                            </Button>
                         </div>
 
-                        <ModeToggle />
-
-                        <Button variant="ghost" size="icon" className="relative">
-                            <Bell className="w-6 h-6" />
-                            <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
-                        </Button>
-
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Avatar className="h-12 w-12 cursor-pointer hover:ring-2 ring-primary transition-all">
-                                    <AvatarImage src="https://github.com/shadcn.png" />
-                                    <AvatarFallback>JD</AvatarFallback>
-                                </Avatar>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56">
-                                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="cursor-pointer">
-                                    <User className="mr-2 h-4 w-4" />
-                                    <span>Profile</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="cursor-pointer">
-                                    <Settings className="mr-2 h-4 w-4" />
-                                    <span>Settings</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="cursor-pointer text-red-500 focus:text-red-500">
-                                    <LogOut className="mr-2 h-4 w-4" />
-                                    <span>Log out</span>
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                </header>
-
-                <Tabs defaultValue="push" className="w-full space-y-8">
-                    <TabsList className="grid w-full grid-cols-5 h-14 bg-muted/50 p-1 rounded-xl">
-                        <TabsTrigger value="push" className="text-lg data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">Push</TabsTrigger>
-                        <TabsTrigger value="pull" className="text-lg data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">Pull</TabsTrigger>
-                        <TabsTrigger value="legs" className="text-lg data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">Legs</TabsTrigger>
-                        <TabsTrigger value="upper" className="text-lg data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">Upper</TabsTrigger>
-                        <TabsTrigger value="lower" className="text-lg data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">Lower</TabsTrigger>
-                    </TabsList>
-
-                    {Object.entries(trainingSplit).map(([key, session]) => (
-                        <TabsContent key={key} value={key} className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-4 duration-500">
-                            <div className="bg-card rounded-2xl p-6 shadow-sm border border-border/50">
-                                <div className="flex justify-between items-end mb-6">
-                                    <div>
-                                        <h2 className="text-3xl font-bold tracking-tight">{session.title}</h2>
-                                        <p className="text-muted-foreground text-lg mt-1 flex items-center gap-2">
-                                            <Activity className="w-5 h-5" />
-                                            Focus: {session.focus}
-                                        </p>
-                                    </div>
-                                    <Button size="lg" className="gap-2">
-                                        Start Session <PlayCircle className="w-5 h-5" />
-                                    </Button>
-                                </div>
-
-                                <div className="space-y-4">
-                                    {session.exercises.map((exercise, index) => (
-                                        <div
+                        <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="hover:bg-transparent">
+                                        <TableHead className="w-[400px]">Exercise</TableHead>
+                                        <TableHead>Target Muscle</TableHead>
+                                        <TableHead>Sets</TableHead>
+                                        <TableHead>Reps</TableHead>
+                                        <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {session.exercises.map((exercise) => (
+                                        <TableRow
                                             key={exercise.id}
-                                            className="group flex items-center gap-4 p-4 rounded-xl bg-background hover:bg-accent/50 border border-border/50 transition-all cursor-pointer"
+                                            className="cursor-pointer hover:bg-muted/50 transition-colors group"
                                             onClick={() => navigate(`/exercise/${exercise.id}`)}
                                         >
-                                            <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted shrink-0">
-                                                <img
-                                                    src={exercise.image}
-                                                    alt={exercise.title}
-                                                    className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                                />
-                                            </div>
-
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <h3 className="text-lg font-semibold truncate">{exercise.title}</h3>
-                                                    <Badge variant="secondary" className="text-xs font-normal">
-                                                        {exercise.muscle}
-                                                    </Badge>
+                                            <TableCell className="font-medium">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="h-12 w-12 rounded-lg overflow-hidden bg-muted shrink-0">
+                                                        <img
+                                                            src={exercise.image}
+                                                            alt={exercise.title}
+                                                            className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                                        />
+                                                    </div>
+                                                    <span className="text-base">{exercise.title}</span>
                                                 </div>
-                                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                                    <span className="flex items-center gap-1">
-                                                        <Dumbbell className="w-3 h-3" /> {exercise.sets} Sets
-                                                    </span>
-                                                    <span className="flex items-center gap-1">
-                                                        <Activity className="w-3 h-3" /> {exercise.reps} Reps
-                                                    </span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="secondary" className="font-normal">
+                                                    {exercise.muscle}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2 text-muted-foreground">
+                                                    <Dumbbell className="w-4 h-4" />
+                                                    {exercise.sets}
                                                 </div>
-                                            </div>
-
-                                            <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <ChevronRight className="w-5 h-5" />
-                                            </Button>
-                                        </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2 text-muted-foreground">
+                                                    <Activity className="w-4 h-4" />
+                                                    {exercise.reps}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <ChevronRight className="w-5 h-5" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
                                     ))}
-                                </div>
-                            </div>
-                        </TabsContent>
-                    ))}
-                </Tabs>
-            </div>
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </TabsContent>
+                ))}
+            </Tabs>
         </div>
     );
 };
