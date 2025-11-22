@@ -226,8 +226,6 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
 
             {/* Camera View */}
             <div className="relative flex flex-col items-center">
-                <h1 className="text-3xl font-bold mb-4 text-gray-800 dark:text-white">SpottAIr Pose Trainer</h1>
-
                 <div className="relative w-[640px] h-[480px] bg-black rounded-lg overflow-hidden shadow-2xl ring-1 ring-white/10">
                     <Webcam
                         ref={webcamRef}
