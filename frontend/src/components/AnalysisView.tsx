@@ -1,14 +1,18 @@
 import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Activity, Trophy, Play, Pause, RotateCcw, MousePointer2 } from 'lucide-react';
+import { Activity, Play, Pause, MousePointer2 } from 'lucide-react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { PointerLockControls, Grid, Environment } from '@react-three/drei';
+import { PointerLockControls, Grid } from '@react-three/drei';
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import * as THREE from 'three';
 import { POSE_CONNECTIONS } from '@mediapipe/pose';
+import ReactMarkdown from 'react-markdown';
 
 interface AnalysisViewProps {
     recordedData?: any[];
+    analysisFeedback?: string | null;
+    isAnalyzing?: boolean;
 }
 
 // FPS Movement Controls
@@ -55,7 +59,7 @@ const FPSControls = () => {
         };
     }, []);
 
-    useFrame((state, delta) => {
+    useFrame((_, delta) => {
         const speed = 5 * delta; // Movement speed
         const direction = new THREE.Vector3();
         const frontVector = new THREE.Vector3(
@@ -91,20 +95,8 @@ const Skeleton = ({ landmarks }: { landmarks: any[] }) => {
 
     const VISIBILITY_THRESHOLD = 0.5;
 
-    // Convert landmarks to Vector3
-    // MediaPipe world landmarks: x (right), y (up), z (forward/backward)
-    // We might need to scale/invert axes to match Three.js coordinate system
-    // Three.js: y is up, x is right, z is forward (towards viewer)
-
     const points = useMemo(() => {
-        // 1. Convert to Three.js coordinates first
         const rawPoints = landmarks.map((lm: any) => new THREE.Vector3(-lm.x, -lm.y, -lm.z));
-
-        // 2. Find the lowest point (minimum Y) among foot landmarks
-        // MediaPipe Pose Landmarks:
-        // 27: left_ankle, 28: right_ankle
-        // 29: left_heel, 30: right_heel
-        // 31: left_foot_index, 32: right_foot_index
         const footIndices = [27, 28, 29, 30, 31, 32];
         let minY = Infinity;
 
@@ -114,23 +106,16 @@ const Skeleton = ({ landmarks }: { landmarks: any[] }) => {
             }
         });
 
-        // If no foot points found (unlikely), just use 0 offset or min of all points
         if (minY === Infinity) {
             minY = Math.min(...rawPoints.map((p: THREE.Vector3) => p.y));
         }
 
-        // 3. Calculate offset to bring lowest point to Y=0 (floor)
-        // We want newY = oldY + offset => 0 = minY + offset => offset = -minY
-        // However, we might want to keep the lowest point slightly above 0 (e.g. radius of joint)
-        const offset = -minY + 0.03; // +0.03 for the sphere radius
-
-        // 4. Apply offset
+        const offset = -minY + 0.03;
         return rawPoints.map((p: THREE.Vector3) => new THREE.Vector3(p.x, p.y + offset, p.z));
     }, [landmarks]);
 
     return (
         <group>
-            {/* Joints */}
             {points.map((pos: THREE.Vector3, i: number) => {
                 const isVisible = (landmarks[i].visibility ?? 1) > VISIBILITY_THRESHOLD;
                 if (!isVisible) return null;
@@ -143,7 +128,6 @@ const Skeleton = ({ landmarks }: { landmarks: any[] }) => {
                 );
             })}
 
-            {/* Bones */}
             {POSE_CONNECTIONS.map(([start, end], i) => {
                 const startPoint = points[start];
                 const endPoint = points[end];
@@ -157,7 +141,6 @@ const Skeleton = ({ landmarks }: { landmarks: any[] }) => {
                 const length = direction.length();
                 const midPoint = new THREE.Vector3().addVectors(startPoint, endPoint).multiplyScalar(0.5);
 
-                // Quaternion for rotation
                 const quaternion = new THREE.Quaternion();
                 quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
 
@@ -172,7 +155,6 @@ const Skeleton = ({ landmarks }: { landmarks: any[] }) => {
     );
 };
 
-import { Slider } from "@/components/ui/slider";
 
 const ReplayScene = ({
     data,
@@ -191,12 +173,10 @@ const ReplayScene = ({
     const playbackTimeRef = useRef(0);
     const frameIndexRef = useRef(0);
 
-    // Check if data has timestamps (new format)
     const hasTimestamps = useMemo(() => {
         return data && data.length > 0 && 'timestamp' in data[0];
     }, [data]);
 
-    // Calculate total duration and start time (only for timestamped data)
     const { startTime, duration } = useMemo(() => {
         if (!hasTimestamps || !data || data.length < 2) return { startTime: 0, duration: 0 };
         const start = data[0].timestamp;
@@ -204,25 +184,22 @@ const ReplayScene = ({
         return { startTime: start, duration: end - start };
     }, [data, hasTimestamps]);
 
-    useFrame((state, delta) => {
+    useFrame((_, delta) => {
         if (data.length === 0) return;
 
         let currentTime = playbackTimeRef.current;
 
-        // Handle Manual Scrubbing
         if (manualTime !== null && manualTime !== undefined) {
             currentTime = manualTime;
             playbackTimeRef.current = manualTime;
         }
-        // Handle Playback
         else if (isPlaying) {
             if (hasTimestamps && duration > 0) {
                 currentTime += (delta * 1000) * speed;
                 if (currentTime > duration) currentTime = currentTime % duration;
             } else {
-                // Legacy playback
                 currentTime += delta * speed;
-                if (currentTime > 0.033) { // ~30fps
+                if (currentTime > 0.033) {
                     frameIndexRef.current = (frameIndexRef.current + 1) % data.length;
                     currentTime = 0;
                 }
@@ -230,25 +207,21 @@ const ReplayScene = ({
             playbackTimeRef.current = currentTime;
         }
 
-        // Notify parent of current time
         if (onTimeUpdate) {
             onTimeUpdate(currentTime);
         }
 
-        // Find Frame
         if (hasTimestamps && duration > 0) {
             const targetTime = startTime + currentTime;
             const frame = data.find(f => f.timestamp >= targetTime) || data[data.length - 1];
             if (frame) setCurrentFrame(frame);
         } else {
-            // Legacy
-            if (manualTime === null) { // Only update if not scrubbing (legacy scrubbing not fully supported yet)
+            if (manualTime === null) {
                 setCurrentFrame(data[frameIndexRef.current]);
             }
         }
     });
 
-    // Reset on data change
     useEffect(() => {
         if (data.length > 0) {
             setCurrentFrame(data[0]);
@@ -259,17 +232,16 @@ const ReplayScene = ({
 
     if (!currentFrame) return null;
 
-    // Handle both formats: { timestamp, landmarks } OR [landmarks]
     const landmarks = currentFrame.landmarks || currentFrame;
 
     return (
-        <group position={[0, 1, 0]}> {/* Lift skeleton up a bit */}
+        <group position={[0, 1, 0]}>
             <Skeleton landmarks={landmarks} />
         </group>
     );
 };
 
-const AnalysisView: React.FC<AnalysisViewProps> = ({ recordedData = [] }) => {
+const AnalysisView: React.FC<AnalysisViewProps> = ({ recordedData = [], analysisFeedback, isAnalyzing = false }) => {
     const [isPlaying, setIsPlaying] = useState(true);
     const [sliderValue, setSliderValue] = useState(0);
     const [isScrubbing, setIsScrubbing] = useState(false);
@@ -290,6 +262,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ recordedData = [] }) => {
 
     return (
         <div className="space-y-6">
+            {/* ... (stats cards remain same) ... */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -304,79 +277,106 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ recordedData = [] }) => {
                 {/* ... other cards ... */}
             </div>
 
-            <Card className="h-[600px] bg-black/90 overflow-hidden relative flex flex-col">
-                {!hasData ? (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                        <p>No recording available. Complete an exercise to see 3D replay.</p>
-                    </div>
-                ) : (
-                    <>
-                        <div className="absolute top-4 left-4 z-10 flex gap-2 items-center">
-                            <Button
-                                variant="secondary"
-                                size="icon"
-                                onClick={() => setIsPlaying(!isPlaying)}
-                            >
-                                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                            </Button>
-                            <div className="bg-black/50 text-white px-3 py-2 rounded text-xs flex items-center gap-2">
-                                <MousePointer2 className="w-3 h-3" />
-                                <span>Click to Control</span>
-                                <span className="text-white/50">|</span>
-                                <span>WASD to Move</span>
-                                <span className="text-white/50">|</span>
-                                <span>ESC to Exit</span>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* 3D Viewer - Resized and spanning 2 columns */}
+                <Card className="lg:col-span-2 h-[400px] bg-black/90 overflow-hidden relative flex flex-col">
+                    {/* ... (viewer content remains same) ... */}
+                    {!hasData ? (
+                        <div className="flex items-center justify-center h-full text-muted-foreground">
+                            <p>No recording available. Complete an exercise to see 3D replay.</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="absolute top-4 left-4 z-10 flex gap-2 items-center">
+                                <Button
+                                    variant="secondary"
+                                    size="icon"
+                                    onClick={() => setIsPlaying(!isPlaying)}
+                                >
+                                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                                </Button>
+                                <div className="bg-black/50 text-white px-3 py-2 rounded text-xs flex items-center gap-2">
+                                    <MousePointer2 className="w-3 h-3" />
+                                    <span>Click to Control</span>
+                                    <span className="text-white/50">|</span>
+                                    <span>WASD to Move</span>
+                                    <span className="text-white/50">|</span>
+                                    <span>ESC to Exit</span>
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Timeline Controls */}
-                        <div className="absolute bottom-4 left-4 right-4 z-10 bg-black/60 p-4 rounded-lg backdrop-blur-sm flex items-center gap-4">
-                            <span className="text-white font-mono text-sm w-16 text-right">
-                                {formatTime(sliderValue)}
-                            </span>
-                            <Slider
-                                value={[sliderValue]}
-                                max={duration || 100}
-                                step={10}
-                                className="flex-1"
-                                onValueChange={(vals) => {
-                                    setIsScrubbing(true);
-                                    setSliderValue(vals[0]);
-                                    setIsPlaying(false); // Pause while scrubbing
-                                }}
-                                onValueCommit={() => {
-                                    setIsScrubbing(false);
-                                    // Optional: Resume playing if it was playing before? 
-                                    // For now let's leave it paused or let user press play
-                                }}
-                            />
-                            <span className="text-white/50 font-mono text-sm w-16">
-                                {formatTime(duration)}
-                            </span>
-                        </div>
+                            {/* Timeline Controls */}
+                            <div className="absolute bottom-4 left-4 right-4 z-10 bg-black/60 p-4 rounded-lg backdrop-blur-sm flex items-center gap-4">
+                                <span className="text-white font-mono text-sm w-16 text-right">
+                                    {formatTime(sliderValue)}
+                                </span>
+                                <Slider
+                                    value={[sliderValue]}
+                                    max={duration || 100}
+                                    step={10}
+                                    className="flex-1"
+                                    onValueChange={(vals) => {
+                                        setIsScrubbing(true);
+                                        setSliderValue(vals[0]);
+                                        setIsPlaying(false); // Pause while scrubbing
+                                    }}
+                                    onValueCommit={() => {
+                                        setIsScrubbing(false);
+                                    }}
+                                />
+                                <span className="text-white/50 font-mono text-sm w-16">
+                                    {formatTime(duration)}
+                                </span>
+                            </div>
 
-                        <Canvas camera={{ position: [0, 1.5, 4], fov: 50 }}>
-                            <color attach="background" args={['#111']} />
-                            <ambientLight intensity={0.5} />
-                            <directionalLight position={[10, 10, 5]} intensity={1} />
+                            <Canvas camera={{ position: [0, 1.5, 4], fov: 50 }}>
+                                <color attach="background" args={['#111']} />
+                                <ambientLight intensity={0.5} />
+                                <directionalLight position={[10, 10, 5]} intensity={1} />
 
-                            <ReplayScene
-                                data={recordedData}
-                                isPlaying={isPlaying}
-                                manualTime={isScrubbing ? sliderValue : null}
-                                onTimeUpdate={(t) => {
-                                    if (!isScrubbing) setSliderValue(t);
-                                }}
-                            />
+                                <ReplayScene
+                                    data={recordedData}
+                                    isPlaying={isPlaying}
+                                    manualTime={isScrubbing ? sliderValue : null}
+                                    onTimeUpdate={(t) => {
+                                        if (!isScrubbing) setSliderValue(t);
+                                    }}
+                                />
 
-                            <Grid infiniteGrid fadeDistance={30} sectionColor="#444" cellColor="#222" />
+                                <Grid infiniteGrid fadeDistance={30} sectionColor="#444" cellColor="#222" />
 
-                            <FPSControls />
-                            <PointerLockControls />
-                        </Canvas>
-                    </>
-                )}
-            </Card>
+                                <FPSControls />
+                                <PointerLockControls />
+                            </Canvas>
+                        </>
+                    )}
+                </Card>
+
+                {/* AI Feedback Panel */}
+                <Card className="h-[400px] flex flex-col">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <span>🤖</span> AI Coach Feedback
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-1 overflow-y-auto custom-scrollbar">
+                        {isAnalyzing ? (
+                            <div className="h-full flex flex-col items-center justify-center gap-4">
+                                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                                <p className="text-sm text-muted-foreground animate-pulse">Analyzing your form...</p>
+                            </div>
+                        ) : analysisFeedback ? (
+                            <div className="prose dark:prose-invert max-w-none text-sm">
+                                <ReactMarkdown>{analysisFeedback}</ReactMarkdown>
+                            </div>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-center p-4">
+                                <p>Complete a set to receive personalized AI coaching.</p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     );
 };

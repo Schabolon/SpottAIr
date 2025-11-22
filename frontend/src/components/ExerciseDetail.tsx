@@ -13,15 +13,28 @@ const ExerciseDetail: React.FC = () => {
 
     // State to store recorded pose data
     const [recordedData, setRecordedData] = React.useState<any[]>([]);
+    const [analysisFeedback, setAnalysisFeedback] = React.useState<string | null>(null);
+    const [activeTab, setActiveTab] = React.useState("train");
+    const [isAnalyzing, setIsAnalyzing] = React.useState(false);
 
     const handleRecordingComplete = (data: any[]) => {
         console.log("Recording complete, frames:", data.length);
         setRecordedData(data);
     };
 
+    const handleAnalysisStart = () => {
+        setIsAnalyzing(true);
+        setActiveTab("analyze");
+    };
+
+    const handleAnalysisComplete = (feedback: string) => {
+        setAnalysisFeedback(feedback);
+        setIsAnalyzing(false);
+    };
+
     return (
         <div className="h-[calc(100vh-10rem)] flex flex-col">
-            <Tabs defaultValue="train" className="flex-1 flex flex-col min-h-0">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
                 <div className="flex items-center justify-between mb-6 pb-4 border-b shrink-0">
                     <div className="flex items-center gap-4">
                         <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="rounded-full">
@@ -50,13 +63,20 @@ const ExerciseDetail: React.FC = () => {
                     <div className="h-full overflow-hidden">
                         <PoseDetector
                             exerciseId={id || 'unknown'}
+                            targetReps={3}
                             onRecordingComplete={handleRecordingComplete}
+                            onAnalysisComplete={handleAnalysisComplete}
+                            onAnalysisStart={handleAnalysisStart}
                         />
                     </div>
                 </TabsContent>
 
                 <TabsContent value="analyze" className="flex-1 min-h-0 mt-0 animate-in fade-in-50 slide-in-from-bottom-4 duration-500">
-                    <AnalysisView recordedData={recordedData} />
+                    <AnalysisView
+                        recordedData={recordedData}
+                        analysisFeedback={analysisFeedback}
+                        isAnalyzing={isAnalyzing}
+                    />
                 </TabsContent>
             </Tabs>
         </div>
