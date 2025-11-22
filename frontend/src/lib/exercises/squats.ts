@@ -15,7 +15,10 @@ export class SquatProcessor extends BaseExerciseProcessor {
         const rightAnkle = landmarks[PoseLandmarkIndex.RIGHT_ANKLE];
 
         // Basic visibility check
-        if (!leftHip || !rightHip || !leftKnee || !rightKnee || !leftAnkle || !rightAnkle) {
+        const minVisibility = 0.5;
+        const points = [leftHip, rightHip, leftKnee, rightKnee, leftAnkle, rightAnkle];
+
+        if (points.some(p => !p || (p.visibility !== undefined && p.visibility < minVisibility))) {
             return { isGoodForm: false, feedback: ["Body not fully visible"], badPoints: [] };
         }
 
@@ -39,7 +42,10 @@ export class SquatProcessor extends BaseExerciseProcessor {
         const leftAnkle = landmarks[PoseLandmarkIndex.LEFT_ANKLE];
         const rightAnkle = landmarks[PoseLandmarkIndex.RIGHT_ANKLE];
 
-        if (!leftHip || !rightHip || !leftKnee || !rightKnee || !leftAnkle || !rightAnkle) return;
+        const minVisibility = 0.5;
+        const points = [leftHip, rightHip, leftKnee, rightKnee, leftAnkle, rightAnkle];
+
+        if (points.some(p => !p || (p.visibility !== undefined && p.visibility < minVisibility))) return;
 
         // Calculate knee angles
         const leftKneeAngle = this.getAngle(leftHip, leftKnee, leftAnkle);
