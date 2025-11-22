@@ -6,7 +6,10 @@ client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 
 async def analyze_pose(request: AgentParams) -> AgentResponse:
-    instruction = request.instruction or "Analyze the following pose landmarks and provide feedback."
+    instruction = (
+        request.instruction
+        or "Analyze the following pose landmarks and provide feedback."
+    )
 
     messages = [
         {
@@ -23,7 +26,7 @@ async def analyze_pose(request: AgentParams) -> AgentResponse:
                 "image_url": {"url": f"data:image/jpeg;base64,{request.image}"},
             }
         )
-    
+
     user_content.append({"type": "text", "text": instruction})
     messages.append({"role": "user", "content": user_content})
 
