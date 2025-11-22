@@ -2,6 +2,11 @@ import { BaseExerciseProcessor, Landmark, PoseLandmarkIndex } from './types';
 
 export class SquatProcessor extends BaseExerciseProcessor {
 
+    reset() {
+        super.reset();
+        this.minKneeAngle = 180;
+    }
+
     checkForm(landmarks: Landmark[]): { isGoodForm: boolean; feedback: string[]; badPoints: number[] } {
         const feedback: string[] = [];
         const badPoints: number[] = [];
@@ -13,6 +18,11 @@ export class SquatProcessor extends BaseExerciseProcessor {
         const rightKnee = landmarks[PoseLandmarkIndex.RIGHT_KNEE];
         const leftAnkle = landmarks[PoseLandmarkIndex.LEFT_ANKLE];
         const rightAnkle = landmarks[PoseLandmarkIndex.RIGHT_ANKLE];
+        const nose = landmarks[PoseLandmarkIndex.NOSE];
+        const leftWrist = landmarks[PoseLandmarkIndex.LEFT_WRIST];
+        const rightWrist = landmarks[PoseLandmarkIndex.RIGHT_WRIST];
+        const leftShoulder = landmarks[PoseLandmarkIndex.LEFT_SHOULDER];
+        const rightShoulder = landmarks[PoseLandmarkIndex.RIGHT_SHOULDER];
 
         // Basic visibility check
         const minVisibility = 0.5;
@@ -22,17 +32,50 @@ export class SquatProcessor extends BaseExerciseProcessor {
             return { isGoodForm: false, feedback: ["Body not fully visible"], badPoints: [] };
         }
 
-        // Knees caving in (Valgus)
+        // 1. Knees caving in (Valgus)
         const hipWidth = Math.abs(leftHip.x - rightHip.x);
         const kneeWidth = Math.abs(leftKnee.x - rightKnee.x);
         if (kneeWidth < hipWidth * 0.8) {
-            feedback.push("Knees caving in!");
+            feedback.push("Push your knees out!");
             badPoints.push(PoseLandmarkIndex.LEFT_KNEE, PoseLandmarkIndex.RIGHT_KNEE);
             isGoodForm = false;
         }
 
+        // 2. Hands above head check
+        // Y increases downwards, so smaller Y is higher
+        if (nose && leftWrist && rightWrist) {
+            if (leftWrist.y < nose.y || rightWrist.y < nose.y) {
+                feedback.push("Lower your hands!");
+                badPoints.push(PoseLandmarkIndex.LEFT_WRIST, PoseLandmarkIndex.RIGHT_WRIST);
+                isGoodForm = false;
+            }
+        }
+
+        // 3. Foot placement (Stance width)
+        // Feet should be roughly shoulder width apart
+        if (leftShoulder && rightShoulder) {
+            const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
+            const ankleWidth = Math.abs(leftAnkle.x - rightAnkle.x);
+
+            // Too narrow (< 80% shoulder width)
+            if (ankleWidth < shoulderWidth * 0.8) {
+                feedback.push("Widen your stance!");
+                badPoints.push(PoseLandmarkIndex.LEFT_ANKLE, PoseLandmarkIndex.RIGHT_ANKLE);
+                isGoodForm = false;
+            }
+            // Too wide (> 150% shoulder width)
+            else if (ankleWidth > shoulderWidth * 1.5) {
+                feedback.push("Narrow your stance!");
+                badPoints.push(PoseLandmarkIndex.LEFT_ANKLE, PoseLandmarkIndex.RIGHT_ANKLE);
+                isGoodForm = false;
+            }
+        }
+
         return { isGoodForm, feedback, badPoints };
     }
+
+    private minKneeAngle = 180; // Track deepest point
+    private repStartTime = 0; // Track when the rep started
 
     countReps(landmarks: Landmark[], isGoodForm: boolean): void {
         const leftHip = landmarks[PoseLandmarkIndex.LEFT_HIP];
@@ -53,19 +96,37 @@ export class SquatProcessor extends BaseExerciseProcessor {
         const avgKneeAngle = (leftKneeAngle + rightKneeAngle) / 2;
 
         // Check depth
-        // < 90 degrees is a good deep squat
-        // < 100 degrees is acceptable parallel squat
-        const isDeep = avgKneeAngle < 100;
+        // Relaxed threshold: < 110 degrees is acceptable
+        const isDeep = avgKneeAngle < 110;
 
         // Check standing
         // > 160 degrees is standing straight
         const isStanding = avgKneeAngle > 160;
 
         if (this.state.phase === 'start' || this.state.phase === 'up') {
+            // Track minimum angle during non-rep phases to detect "almost" reps
+            if (avgKneeAngle < this.minKneeAngle) {
+                this.minKneeAngle = avgKneeAngle;
+            }
+
             if (isDeep) {
                 this.state.phase = 'down';
                 this.state.isGoodRep = isGoodForm; // Start tracking rep quality
+                this.minKneeAngle = 180; // Reset tracker
+                this.repStartTime = Date.now(); // Start timer
+            } else if (isStanding && this.minKneeAngle < 140) {
+                // If we went down significantly (e.g. < 140) but not enough to trigger rep (< 110)
+                // and are now back up, give feedback.
+                // Only trigger if we haven't already triggered a rep (phase is start/up)
+
+                // Debounce/Check if we just finished a rep? 
+                // Actually, minKneeAngle should be reset on successful rep start.
+                // So if we are here, it means we went down and up WITHOUT triggering 'down'.
+
+                this.state.feedback.push(`Go lower! Reached ${Math.round(this.minKneeAngle)}°`);
+                this.minKneeAngle = 180; // Reset after feedback
             }
+
         } else if (this.state.phase === 'down') {
             // Update quality during the rep
             if (!isGoodForm) {
@@ -77,7 +138,9 @@ export class SquatProcessor extends BaseExerciseProcessor {
                 this.state.phase = 'up';
                 if (this.state.isGoodRep) {
                     this.state.reps += 1;
+                    this.state.lastRepDuration = (Date.now() - this.repStartTime) / 1000;
                 }
+                this.minKneeAngle = 180; // Reset for next rep
             }
         }
     }
