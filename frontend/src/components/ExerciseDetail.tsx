@@ -29,7 +29,7 @@ const ExerciseDetail: React.FC = () => {
 
                     <TabsContent value="train" className="mt-0">
                         <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-                            <PoseDetector />
+                            <PoseDetector exerciseId={id || 'unknown'} />
                         </div>
                     </TabsContent>
 
