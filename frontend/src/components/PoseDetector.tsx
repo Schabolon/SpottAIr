@@ -287,8 +287,17 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
                         </ul>
                     ) : (
                         <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                            <span className="text-4xl mb-2">✓</span>
-                            <p>Good Form</p>
+                            {isExerciseActive ? (
+                                <>
+                                    <span className="text-4xl mb-2">✓</span>
+                                    <p>Good Form</p>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="text-4xl mb-2">⏳</span>
+                                    <p className="text-center">Waiting for training<br />to start...</p>
+                                </>
+                            )}
                         </div>
                     )}
                 </div>
