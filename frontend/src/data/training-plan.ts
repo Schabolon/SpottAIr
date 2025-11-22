@@ -33,7 +33,7 @@ export const trainingSplit = {
         title: "Leg Day",
         focus: "Quads, Hamstrings, Glutes",
         exercises: [
-            { id: 'squats', title: 'Barbell Squats', sets: '4', reps: 8, muscle: 'Quads', icon: ArrowDown, image: 'https://images.unsplash.com/photo-1574680096141-1cddd32e0340?w=800&q=80' },
+            { id: 'squats', title: 'Barbell Squats', sets: '4', reps: 1, muscle: 'Quads', icon: ArrowDown, image: 'https://images.unsplash.com/photo-1574680096141-1cddd32e0340?w=800&q=80' },
             { id: 'rdl', title: 'Romanian Deadlifts', sets: '3', reps: 10, muscle: 'Hamstrings', icon: ArrowDown, image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80' },
             { id: 'leg-press', title: 'Leg Press', sets: '3', reps: 12, muscle: 'Legs', icon: ArrowUp, image: 'https://images.unsplash.com/photo-1574680096141-1cddd32e0340?w=800&q=80' },
             { id: 'lunges', title: 'Walking Lunges', sets: '3', reps: 12, muscle: 'Glutes', icon: Footprints, image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80' },
