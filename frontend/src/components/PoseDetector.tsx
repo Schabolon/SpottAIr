@@ -16,7 +16,7 @@ interface PoseDetectorProps {
     onAnalysisStart?: () => void;
 }
 
-const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'squats', targetReps = 10, onRecordingComplete, onAnalysisComplete, onAnalysisStart }) => {
+const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'squats', targetReps = 1, onRecordingComplete, onAnalysisComplete, onAnalysisStart }) => {
     const webcamRef = useRef<Webcam>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isExerciseActive, setIsExerciseActive] = useState(false);

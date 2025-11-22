@@ -7,10 +7,19 @@ import { toast } from "sonner";
 import PoseDetector from './PoseDetector';
 import AnalysisView from './AnalysisView';
 
+import { trainingSplit } from '../data/training-plan';
+
 const ExerciseDetail: React.FC = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const exerciseTitle = id ? id.charAt(0).toUpperCase() + id.slice(1) : 'Exercise';
+
+    // Find exercise to get target reps
+    const exercise = Object.values(trainingSplit)
+        .flatMap(day => day.exercises)
+        .find(ex => ex.id === id);
+
+    const targetReps = exercise?.reps || 10; // Default to 10 if not found
 
     // State to store recorded pose data
     const [recordedData, setRecordedData] = React.useState<any[]>([]);
@@ -70,7 +79,7 @@ const ExerciseDetail: React.FC = () => {
                     <div className="h-full overflow-hidden">
                         <PoseDetector
                             exerciseId={id || 'unknown'}
-                            targetReps={3}
+                            targetReps={typeof targetReps === 'number' ? targetReps : 10}
                             onRecordingComplete={handleRecordingComplete}
                             onAnalysisComplete={handleAnalysisComplete}
                             onAnalysisStart={handleAnalysisStart}
