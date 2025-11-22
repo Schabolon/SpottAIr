@@ -6,6 +6,8 @@ import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { getProcessor } from '../lib/exercises/registry';
 import { ExerciseState } from '../lib/exercises/types';
 import ReactMarkdown from 'react-markdown';
+import { useSpottair } from '@/lib/spottair';
+import * as tf from '@tensorflow/tfjs';
 
 interface PoseDetectorProps {
     exerciseId?: string;
@@ -86,6 +88,14 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
     // Recording Ref
     const currentRecordingRef = useRef<any[]>([]);
 
+
+  const modelRef = useRef<tf.GraphModel | null>(null);
+
+  // Load SpottAIr model
+  const { model, isLoading, error, runInference } = useSpottair('/models/model.json', 'tflite');
+
+  const isLoadingRef = useRef(isLoading);
+
     useEffect(() => {
         isExerciseActiveRef.current = isExerciseActive;
     }, [isExerciseActive]);
@@ -107,6 +117,14 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
             history: []
         });
     }, [exerciseId]);
+
+  useEffect(() => {
+    modelRef.current = model;
+  }, [model]);
+
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
 
     // Countdown timer logic
     useEffect(() => {
@@ -153,8 +171,27 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
         }
     };
 
-    const onResults = (results: Results) => {
+    const onResults = async (results: Results) => {
         if (!canvasRef.current || !webcamRef.current || !webcamRef.current.video) return;
+
+        // ✅ Check if we have landmarks AND model is ready before running inference
+        if (results.poseLandmarks && model && !isLoading) {
+          try {
+            const output = await runInference(results.poseLandmarks);
+            if (output) {
+              console.log('SpottAIr Output:', output);
+              // TODO: Use the output for exercise classification or feedback
+            } else {
+              console.log('Inference returned null');
+            }
+          } catch (err) {
+            console.error('Error running SpottAIr inference:', err);
+          }
+        } else {
+          // Debug: log why inference isn't running
+          if (!results.poseLandmarks) console.log('No pose landmarks detected');
+          if (!model) console.log('Model not ready');
+        }
 
         const videoWidth = webcamRef.current.video.videoWidth;
         const videoHeight = webcamRef.current.video.videoHeight;
@@ -229,6 +266,9 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
 
     // Initialize Pose instance once
     useEffect(() => {
+      if (isLoading || !model) {
+        return;
+      }
         const pose = new Pose({
             locateFile: (file) => {
                 return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
@@ -250,9 +290,9 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
         return () => {
             pose.close();
         };
-    }, []);
+    }, [model, isLoading]);
 
-    // Control the detection loop based on active state
+  // Control the detection loop based on active state
     useEffect(() => {
         const detectPose = async () => {
             if (
@@ -302,8 +342,7 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
                 });
             }
         };
-    }, []);
-
+    }, [model, isLoading]); // ✅ ADD THESE DEPENDENCIES!}, [model, isLoading]); // ✅ ADD THESE DEPENDENCIES!
     return (
         <div className="flex flex-col lg:flex-row gap-6 h-full pt-6">
             {/* Camera View */}
