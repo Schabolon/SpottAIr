@@ -75,6 +75,7 @@ export class SquatProcessor extends BaseExerciseProcessor {
     }
 
     private minKneeAngle = 180; // Track deepest point
+    private startKneeAngle = 180; // Track angle at start of rep
     private repStartTime = 0; // Track when the rep started
 
     countReps(landmarks: Landmark[], isGoodForm: boolean): void {
@@ -112,7 +113,8 @@ export class SquatProcessor extends BaseExerciseProcessor {
             if (isDeep) {
                 this.state.phase = 'down';
                 this.state.isGoodRep = isGoodForm; // Start tracking rep quality
-                this.minKneeAngle = 180; // Reset tracker
+                this.minKneeAngle = avgKneeAngle; // Initialize with current angle
+                this.startKneeAngle = avgKneeAngle; // Track start angle
                 this.repStartTime = Date.now(); // Start timer
             } else if (isStanding && this.minKneeAngle < 140) {
                 // If we went down significantly (e.g. < 140) but not enough to trigger rep (< 110)
@@ -128,6 +130,11 @@ export class SquatProcessor extends BaseExerciseProcessor {
             }
 
         } else if (this.state.phase === 'down') {
+            // Update minimum angle
+            if (avgKneeAngle < this.minKneeAngle) {
+                this.minKneeAngle = avgKneeAngle;
+            }
+
             // Update quality during the rep
             if (!isGoodForm) {
                 this.state.isGoodRep = false;
@@ -138,7 +145,35 @@ export class SquatProcessor extends BaseExerciseProcessor {
                 this.state.phase = 'up';
                 if (this.state.isGoodRep) {
                     this.state.reps += 1;
-                    this.state.lastRepDuration = (Date.now() - this.repStartTime) / 1000;
+                    const duration = (Date.now() - this.repStartTime) / 1000;
+                    this.state.lastRepDuration = duration;
+
+                    // Record history
+                    this.state.history.push({
+                        duration: duration,
+                        feedback: [...this.state.feedback], // Capture feedback at end of rep
+                        minAngles: { "knee": this.minKneeAngle },
+                        startAngles: { "knee": this.startKneeAngle },
+                        isValid: true
+                    });
+                } else {
+                    // Record failed rep? User only asked for "reps", implying successful ones?
+                    // But feedback on failed reps is useful. Let's record it but mark isValid=false
+                    // if we want to track failed attempts. For now, let's stick to counted reps
+                    // or maybe we should track everything.
+                    // The prompt says "Number of Reps" and "For each Rep".
+                    // Usually "Reps" means successful ones.
+                    // But "feedback given" implies we want to know about mistakes.
+                    // Let's record it if it was a "rep attempt" (went down and up).
+
+                    const duration = (Date.now() - this.repStartTime) / 1000;
+                    this.state.history.push({
+                        duration: duration,
+                        feedback: [...this.state.feedback],
+                        minAngles: { "knee": this.minKneeAngle },
+                        startAngles: { "knee": this.startKneeAngle },
+                        isValid: false
+                    });
                 }
                 this.minKneeAngle = 180; // Reset for next rep
             }
