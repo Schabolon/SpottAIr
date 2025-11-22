@@ -2,7 +2,8 @@ import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
-from app.core.schemas import AgentParams, AgentResponse
+from langchain_core.output_parsers import JsonOutputParser
+from app.core.schemas import AgentParams, AgentResponse, EvaluationResponse
 
 load_dotenv()
 
@@ -89,12 +90,9 @@ async def analyze_pose(request: AgentParams) -> AgentResponse:
     return AgentResponse(text=response.content)
 
 
-from app.core.schemas import EvaluationResponse
-from langchain_core.output_parsers import JsonOutputParser
-
 async def quick_evaluate(request: AgentParams) -> EvaluationResponse:
     parser = JsonOutputParser(pydantic_object=EvaluationResponse)
-    
+
     instruction = (
         "You are a strict fitness coach. Analyze the session data to decide if the user needs detailed feedback. "
         "Return JSON with a single key 'needs_feedback' (boolean). "
@@ -115,7 +113,7 @@ async def quick_evaluate(request: AgentParams) -> EvaluationResponse:
 
     messages = [
         SystemMessage(content="You are a fitness AI. Output valid JSON only."),
-        HumanMessage(content=instruction + "\n" + parser.get_format_instructions())
+        HumanMessage(content=instruction + "\n" + parser.get_format_instructions()),
     ]
 
     try:
