@@ -224,6 +224,10 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
         }
     };
 
+    const poseRef = useRef<Pose | null>(null);
+    const requestRef = useRef<number | undefined>(undefined);
+
+    // Initialize Pose instance once
     useEffect(() => {
         const pose = new Pose({
             locateFile: (file) => {
@@ -241,27 +245,54 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
         });
 
         pose.onResults(onResults);
+        poseRef.current = pose;
 
-        let animationFrameId: number;
+        return () => {
+            pose.close();
+        };
+    }, []);
 
+    // Control the detection loop based on active state
+    useEffect(() => {
         const detectPose = async () => {
             if (
                 webcamRef.current &&
                 webcamRef.current.video &&
-                webcamRef.current.video.readyState === 4
+                webcamRef.current.video.readyState === 4 &&
+                poseRef.current
             ) {
-                await pose.send({ image: webcamRef.current.video });
+                await poseRef.current.send({ image: webcamRef.current.video });
             }
-            animationFrameId = requestAnimationFrame(detectPose);
+            requestRef.current = requestAnimationFrame(detectPose);
         };
 
-        detectPose();
+        if (isExerciseActive || isCountingDown) {
+            // Start loop
+            requestRef.current = requestAnimationFrame(detectPose);
+        } else {
+            // Stop loop and clear canvas
+            if (requestRef.current) {
+                cancelAnimationFrame(requestRef.current);
+            }
+            if (canvasRef.current) {
+                const ctx = canvasRef.current.getContext('2d');
+                if (ctx) {
+                    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                }
+            }
+        }
 
         return () => {
-            console.log("Cleaning up PoseDetector...");
-            cancelAnimationFrame(animationFrameId);
+            if (requestRef.current) {
+                cancelAnimationFrame(requestRef.current);
+            }
+        };
+    }, [isExerciseActive, isCountingDown]);
 
-            // 1. Manually stop tracks from the webcam ref
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            console.log("Cleaning up PoseDetector...");
             if (webcamRef.current && webcamRef.current.video && webcamRef.current.video.srcObject) {
                 const stream = webcamRef.current.video.srcObject as MediaStream;
                 const tracks = stream.getTracks();
@@ -270,9 +301,6 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
                     track.stop();
                 });
             }
-
-            // 3. Close pose solution
-            pose.close();
         };
     }, []);
 
@@ -291,35 +319,37 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
 
                 {isCountingDown && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-20 backdrop-blur-sm">
-                        <div className="text-8xl font-light text-white animate-in zoom-in duration-300 drop-shadow-lg">
+                        <div className="text-9xl font-bold tracking-tighter text-white animate-in zoom-in duration-300 drop-shadow-2xl">
                             {countdownValue}
                         </div>
                     </div>
                 )}
 
                 {/* Floating Controls */}
+                {/* Floating Controls */}
+                {/* Floating Controls */}
                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
                     <button
                         onClick={startExercise}
-                        className={`flex items-center gap-3 px-6 py-3 rounded-full font-medium text-base shadow-lg transition-all transform hover:scale-105 backdrop-blur-md ${isExerciseActive || isCountingDown
-                            ? 'bg-red-500/90 hover:bg-red-600 text-white shadow-red-500/20'
-                            : 'bg-white/90 hover:bg-white text-black shadow-white/20'
+                        className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm shadow-lg transition-all transform hover:scale-105 active:scale-95 backdrop-blur-md border ${isExerciseActive || isCountingDown
+                            ? 'bg-red-500 text-white border-red-400 shadow-red-500/20'
+                            : 'bg-white/90 text-black border-white/20 shadow-black/5'
                             }`}
                     >
                         {isExerciseActive ? (
                             <>
-                                <span className="w-4 h-4 bg-current rounded-sm" />
-                                Stop Session
+                                <div className="w-3 h-3 bg-current rounded-[2px]" />
+                                <span>Stop Session</span>
                             </>
                         ) : isCountingDown ? (
                             <>
-                                <span className="animate-spin text-2xl">⏳</span>
-                                Get Ready...
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                <span>Get Ready...</span>
                             </>
                         ) : (
                             <>
-                                <span className="w-0 h-0 border-t-[8px] border-t-transparent border-l-[14px] border-l-current border-b-[8px] border-b-transparent ml-1" />
-                                Start Exercise
+                                <div className="w-0 h-0 border-t-[5px] border-t-transparent border-l-[8px] border-l-current border-b-[5px] border-b-transparent ml-0.5" />
+                                <span>Start Exercise</span>
                             </>
                         )}
                     </button>
@@ -339,14 +369,11 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
             {/* Sidebar Stats */}
             <div className="w-full lg:w-[320px] flex flex-col gap-4">
                 {/* Rep Counter */}
-                <div className={`relative overflow-hidden p-8 rounded-3xl shadow-lg border transition-all duration-500 ${poseState.isGoodRep
-                    ? 'bg-gradient-to-br from-green-500/10 to-emerald-500/5 border-green-500/20'
-                    : 'bg-gradient-to-br from-yellow-500/10 to-orange-500/5 border-yellow-500/20'
-                    }`}>
-                    <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Current Reps</h2>
+                {/* Rep Counter */}
+                <div className="relative overflow-hidden p-6 rounded-3xl shadow-sm border bg-card text-card-foreground">
+                    <h2 className="text-base font-semibold mb-2 flex items-center gap-2">Current Reps</h2>
                     <div className="flex items-baseline gap-2">
-                        <span className={`text-8xl font-black tracking-tighter ${poseState.isGoodRep ? 'text-green-500' : 'text-yellow-500'
-                            }`}>
+                        <span className="text-7xl font-bold tracking-tight">
                             {poseState.reps}
                         </span>
                         <span className="text-2xl font-light text-muted-foreground">/ {targetReps}</span>
@@ -355,13 +382,13 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
                     {/* Progress Bar */}
                     <div className="absolute bottom-0 left-0 w-full h-1 bg-muted">
                         <div
-                            className={`h-full transition-all duration-500 ${poseState.isGoodRep ? 'bg-green-500' : 'bg-yellow-500'}`}
+                            className="h-full transition-all duration-500 bg-primary"
                             style={{ width: `${Math.min((poseState.reps / targetReps) * 100, 100)}%` }}
                         />
                     </div>
                     {poseState.reps > 0 && (
-                        <div className="mt-2 text-center text-gray-700 dark:text-gray-200 font-bold text-xl">
-                            Last Rep: {poseState.lastRepDuration?.toFixed(1) || '0.0'}s
+                        <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                            <span className="font-medium text-foreground">Last Rep:</span> {poseState.lastRepDuration?.toFixed(1) || '0.0'}s
                         </div>
                     )}
                 </div>
