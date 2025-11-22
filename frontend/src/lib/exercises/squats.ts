@@ -1,4 +1,4 @@
-import { BaseExerciseProcessor, Landmark } from './types';
+import { BaseExerciseProcessor, Landmark, PoseLandmarkIndex } from './types';
 
 export class SquatProcessor extends BaseExerciseProcessor {
 
@@ -7,12 +7,12 @@ export class SquatProcessor extends BaseExerciseProcessor {
         const badPoints: number[] = [];
         let isGoodForm = true;
 
-        const leftHip = landmarks[23];
-        const rightHip = landmarks[24];
-        const leftKnee = landmarks[25];
-        const rightKnee = landmarks[26];
-        const leftAnkle = landmarks[27];
-        const rightAnkle = landmarks[28];
+        const leftHip = landmarks[PoseLandmarkIndex.LEFT_HIP];
+        const rightHip = landmarks[PoseLandmarkIndex.RIGHT_HIP];
+        const leftKnee = landmarks[PoseLandmarkIndex.LEFT_KNEE];
+        const rightKnee = landmarks[PoseLandmarkIndex.RIGHT_KNEE];
+        const leftAnkle = landmarks[PoseLandmarkIndex.LEFT_ANKLE];
+        const rightAnkle = landmarks[PoseLandmarkIndex.RIGHT_ANKLE];
 
         // Basic visibility check
         if (!leftHip || !rightHip || !leftKnee || !rightKnee || !leftAnkle || !rightAnkle) {
@@ -24,7 +24,7 @@ export class SquatProcessor extends BaseExerciseProcessor {
         const kneeWidth = Math.abs(leftKnee.x - rightKnee.x);
         if (kneeWidth < hipWidth * 0.8) {
             feedback.push("Knees caving in!");
-            badPoints.push(25, 26);
+            badPoints.push(PoseLandmarkIndex.LEFT_KNEE, PoseLandmarkIndex.RIGHT_KNEE);
             isGoodForm = false;
         }
 
@@ -32,12 +32,12 @@ export class SquatProcessor extends BaseExerciseProcessor {
     }
 
     countReps(landmarks: Landmark[], isGoodForm: boolean): void {
-        const leftHip = landmarks[23];
-        const rightHip = landmarks[24];
-        const leftKnee = landmarks[25];
-        const rightKnee = landmarks[26];
-        const leftAnkle = landmarks[27];
-        const rightAnkle = landmarks[28];
+        const leftHip = landmarks[PoseLandmarkIndex.LEFT_HIP];
+        const rightHip = landmarks[PoseLandmarkIndex.RIGHT_HIP];
+        const leftKnee = landmarks[PoseLandmarkIndex.LEFT_KNEE];
+        const rightKnee = landmarks[PoseLandmarkIndex.RIGHT_KNEE];
+        const leftAnkle = landmarks[PoseLandmarkIndex.LEFT_ANKLE];
+        const rightAnkle = landmarks[PoseLandmarkIndex.RIGHT_ANKLE];
 
         if (!leftHip || !rightHip || !leftKnee || !rightKnee || !leftAnkle || !rightAnkle) return;
 
