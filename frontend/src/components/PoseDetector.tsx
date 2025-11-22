@@ -89,12 +89,12 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
     const currentRecordingRef = useRef<any[]>([]);
 
 
-  const modelRef = useRef<tf.GraphModel | null>(null);
+    const modelRef = useRef<tf.GraphModel | null>(null);
 
-  // Load SpottAIr model
-  const { model, isLoading, error, runInference } = useSpottair('/models/model.json', 'tflite');
+    // Load SpottAIr model
+    const { model, isLoading, error, runInference } = useSpottair('/models/model.json', 'tflite');
 
-  const isLoadingRef = useRef(isLoading);
+    const isLoadingRef = useRef(isLoading);
 
     useEffect(() => {
         isExerciseActiveRef.current = isExerciseActive;
@@ -118,13 +118,13 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
         });
     }, [exerciseId]);
 
-  useEffect(() => {
-    modelRef.current = model;
-  }, [model]);
+    useEffect(() => {
+        modelRef.current = model;
+    }, [model]);
 
-  useEffect(() => {
-    isLoadingRef.current = isLoading;
-  }, [isLoading]);
+    useEffect(() => {
+        isLoadingRef.current = isLoading;
+    }, [isLoading]);
 
     // Countdown timer logic
     useEffect(() => {
@@ -171,26 +171,90 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
         }
     };
 
+    const [currentFeedbackClass, setCurrentFeedbackClass] = useState<string>('correct');
+    const [debugInfo, setDebugInfo] = useState<{ class: string, confidence: number } | null>(null);
+    const lastClassChangeTimeRef = useRef<number>(0);
+    const pendingClassRef = useRef<string | null>(null);
+    const currentFeedbackClassRef = useRef<string>('correct'); // Ref to track current state without dependency issues
+
     const onResults = (results: Results) => {
         if (!canvasRef.current || !webcamRef.current || !webcamRef.current.video) return;
 
         // ✅ Check if we have landmarks AND model is ready before running inference
         if (results.poseLandmarks && model && !isLoading) {
-          try {
-            const output = runInference(results.poseLandmarks);
-            if (output) {
-              console.log('SpottAIr Output:', output);
-              // TODO: Use the output for exercise classification or feedback
-            } else {
-              console.log('Inference returned null');
+            try {
+                let detectedClass = "correct";
+                let rawClass = "correct";
+                let rawConfidence = 0;
+
+                // 1. Visibility Check (Landmarks 11-32: Shoulders to Feet)
+                // We skip 0-10 (face) as requested
+                const bodyLandmarks = results.poseLandmarks.slice(11, 33);
+                const isVisible = bodyLandmarks.every(lm => lm.visibility && lm.visibility > 0.5);
+
+                if (!isVisible) {
+                    detectedClass = "not_visible";
+                } else {
+                    // 2. Run Inference
+                    const output = runInference(results.poseLandmarks);
+                    if (output) {
+                        // console.log('SpottAIr Output:', output);
+                        // Find index of max value
+                        const maxVal = Math.max(...output);
+                        const maxIndex = output.indexOf(maxVal);
+                        const classes = ["correct", "feet_wide", "knees_caved", "spine_misalignment"];
+
+                        rawClass = classes[maxIndex] || "unknown";
+                        rawConfidence = maxVal;
+
+                        // 3. Confidence Threshold (> 0.8)
+                        if (maxVal > 0.8) {
+                            detectedClass = classes[maxIndex] || "correct";
+                        } else {
+                            detectedClass = "correct";
+                        }
+                    }
+                }
+
+                // Update debug info (throttled slightly by React state batching, but good enough)
+                setDebugInfo({ class: rawClass, confidence: rawConfidence });
+
+                const now = Date.now();
+
+                // 4. Debouncing Logic
+                // Case A: Error -> Correct (Immediate)
+                if (detectedClass === 'correct' && currentFeedbackClassRef.current !== 'correct') {
+                    setCurrentFeedbackClass('correct');
+                    currentFeedbackClassRef.current = 'correct';
+                    pendingClassRef.current = null;
+                }
+                // Case B: Any other change (Debounced 500ms)
+                // This covers: Correct -> Error, Error A -> Error B, Correct -> Not Visible
+                else if (detectedClass !== currentFeedbackClassRef.current) {
+                    if (detectedClass === pendingClassRef.current) {
+                        // If we've been seeing this new class for > 500ms, switch to it
+                        if (now - lastClassChangeTimeRef.current > 500) {
+                            setCurrentFeedbackClass(detectedClass);
+                            currentFeedbackClassRef.current = detectedClass;
+                            pendingClassRef.current = null;
+                        }
+                    } else {
+                        // New potential class detected, start timer
+                        pendingClassRef.current = detectedClass;
+                        lastClassChangeTimeRef.current = now;
+                    }
+                } else {
+                    // We are back to the current class, reset pending
+                    pendingClassRef.current = null;
+                }
+
+            } catch (err) {
+                console.error('Error running SpottAIr inference:', err);
             }
-          } catch (err) {
-            console.error('Error running SpottAIr inference:', err);
-          }
         } else {
-          // Debug: log why inference isn't running
-          if (!results.poseLandmarks) console.log('No pose landmarks detected');
-          if (!model) console.log('Model not ready');
+            // Debug: log why inference isn't running
+            // if (!results.poseLandmarks) console.log('No pose landmarks detected');
+            // if (!model) console.log('Model not ready');
         }
 
         const videoWidth = webcamRef.current.video.videoWidth;
@@ -266,9 +330,9 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
 
     // Initialize Pose instance once
     useEffect(() => {
-      if (isLoading || !model) {
-        return;
-      }
+        if (isLoading || !model) {
+            return;
+        }
         const pose = new Pose({
             locateFile: (file) => {
                 return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
@@ -292,7 +356,7 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
         };
     }, [model, isLoading]);
 
-  // Control the detection loop based on active state
+    // Control the detection loop based on active state
     useEffect(() => {
         const detectPose = async () => {
             if (
@@ -433,30 +497,30 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
                 </div>
 
                 {/* Feedback Panel */}
-                <div className="flex-1 bg-card/50 backdrop-blur-sm rounded-3xl border shadow-sm p-6 flex flex-col">
-                    <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-purple-500 fill-purple-500/20" />
-                        <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                            Real-time AI Analysis
-                        </span>
+                <div className={`flex-1 backdrop-blur-sm rounded-3xl border shadow-sm p-6 flex flex-col transition-colors duration-300 ${currentFeedbackClass === 'not_visible' ? 'bg-yellow-500/10 border-yellow-500/50' : currentFeedbackClass !== 'correct' ? 'bg-red-500/10 border-red-500/50' : 'bg-card/50 border-border'}`}>
+                    <h2 className="text-base font-semibold mb-4 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-purple-500 fill-purple-500/20" />
+                            <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                                Real-time AI Analysis
+                            </span>
+                        </div>
+                        {debugInfo && (
+                            <div className="text-[10px] font-mono text-muted-foreground opacity-50">
+                                {debugInfo.class}: {(debugInfo.confidence * 100).toFixed(0)}%
+                            </div>
+                        )}
                     </h2>
 
-                    <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-                        {poseState.feedback.length > 0 ? (
-                            poseState.feedback.map((msg, i) => (
-                                <div key={i} className="flex items-start gap-3 p-4 rounded-2xl bg-red-500/5 border border-red-500/10 text-red-600 dark:text-red-400 animate-in slide-in-from-right-4 duration-300">
-                                    <span className="text-xl mt-0.5">⚠️</span>
-                                    <p className="font-medium leading-snug">{msg}</p>
-                                </div>
-                            ))
-                        ) : (
+                    <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar flex flex-col items-center justify-center">
+                        {currentFeedbackClass === 'correct' ? (
                             <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50 gap-4">
                                 {isExerciseActive ? (
                                     <>
-                                        <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center">
+                                        <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center animate-pulse">
                                             <span className="text-3xl">✨</span>
                                         </div>
-                                        <p className="text-center font-medium">Perfect Form!</p>
+                                        <p className="text-center font-medium text-green-500">Perfect Form!</p>
                                     </>
                                 ) : (
                                     <>
@@ -466,6 +530,36 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
                                         <p className="text-center">Start exercise to<br />receive feedback</p>
                                     </>
                                 )}
+                            </div>
+                        ) : currentFeedbackClass === 'not_visible' ? (
+                            <div className="flex flex-col items-center gap-4 animate-in zoom-in duration-300">
+                                <div className="w-20 h-20 rounded-full bg-yellow-500/20 flex items-center justify-center border-2 border-yellow-500 animate-pulse">
+                                    <span className="text-4xl">📷</span>
+                                </div>
+                                <div className="text-center">
+                                    <h3 className="text-xl font-bold text-yellow-500 mb-1">Visibility Issue</h3>
+                                    <p className="text-yellow-400 font-medium">
+                                        Ensure full body is visible
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center gap-4 animate-in zoom-in duration-300">
+                                <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center border-2 border-red-500 animate-bounce">
+                                    <span className="text-4xl">
+                                        {currentFeedbackClass === 'feet_wide' && '↔️'}
+                                        {currentFeedbackClass === 'knees_caved' && '🦵'}
+                                        {currentFeedbackClass === 'spine_misalignment' && '🦴'}
+                                    </span>
+                                </div>
+                                <div className="text-center">
+                                    <h3 className="text-xl font-bold text-red-500 mb-1">Correction Needed</h3>
+                                    <p className="text-red-400 font-medium">
+                                        {currentFeedbackClass === 'feet_wide' && 'Feet too wide'}
+                                        {currentFeedbackClass === 'knees_caved' && 'Knees caving in'}
+                                        {currentFeedbackClass === 'spine_misalignment' && 'Spine misaligned'}
+                                    </p>
+                                </div>
                             </div>
                         )}
                     </div>
