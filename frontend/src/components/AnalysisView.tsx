@@ -95,15 +95,43 @@ const Skeleton = ({ landmarks }: { landmarks: any[] }) => {
     // Three.js: y is up, x is right, z is forward (towards viewer)
 
     const points = useMemo(() => {
-        return landmarks.map((lm: any) => new THREE.Vector3(-lm.x, -lm.y, -lm.z));
+        // 1. Convert to Three.js coordinates first
+        const rawPoints = landmarks.map((lm: any) => new THREE.Vector3(-lm.x, -lm.y, -lm.z));
+
+        // 2. Find the lowest point (minimum Y) among foot landmarks
+        // MediaPipe Pose Landmarks:
+        // 27: left_ankle, 28: right_ankle
+        // 29: left_heel, 30: right_heel
+        // 31: left_foot_index, 32: right_foot_index
+        const footIndices = [27, 28, 29, 30, 31, 32];
+        let minY = Infinity;
+
+        footIndices.forEach(idx => {
+            if (rawPoints[idx]) {
+                minY = Math.min(minY, rawPoints[idx].y);
+            }
+        });
+
+        // If no foot points found (unlikely), just use 0 offset or min of all points
+        if (minY === Infinity) {
+            minY = Math.min(...rawPoints.map((p: THREE.Vector3) => p.y));
+        }
+
+        // 3. Calculate offset to bring lowest point to Y=0 (floor)
+        // We want newY = oldY + offset => 0 = minY + offset => offset = -minY
+        // However, we might want to keep the lowest point slightly above 0 (e.g. radius of joint)
+        const offset = -minY + 0.03; // +0.03 for the sphere radius
+
+        // 4. Apply offset
+        return rawPoints.map((p: THREE.Vector3) => new THREE.Vector3(p.x, p.y + offset, p.z));
     }, [landmarks]);
 
     return (
         <group>
             {/* Joints */}
-            {points.map((pos, i) => (
+            {points.map((pos: THREE.Vector3, i: number) => (
                 <mesh key={i} position={pos}>
-                    <sphereGeometry args={[0.03, 16, 16]} />
+                    <sphereGeometry args={[0.015, 16, 16]} />
                     <meshStandardMaterial color="hotpink" />
                 </mesh>
             ))}
@@ -134,7 +162,21 @@ const Skeleton = ({ landmarks }: { landmarks: any[] }) => {
     );
 };
 
-const ReplayScene = ({ data, isPlaying, speed = 1 }: { data: any[], isPlaying: boolean, speed?: number }) => {
+import { Slider } from "@/components/ui/slider";
+
+const ReplayScene = ({
+    data,
+    isPlaying,
+    speed = 1,
+    manualTime = null,
+    onTimeUpdate
+}: {
+    data: any[],
+    isPlaying: boolean,
+    speed?: number,
+    manualTime?: number | null,
+    onTimeUpdate?: (time: number) => void
+}) => {
     const [currentFrame, setCurrentFrame] = useState<any>(null);
     const playbackTimeRef = useRef(0);
     const frameIndexRef = useRef(0);
@@ -153,28 +195,44 @@ const ReplayScene = ({ data, isPlaying, speed = 1 }: { data: any[], isPlaying: b
     }, [data, hasTimestamps]);
 
     useFrame((state, delta) => {
-        if (!isPlaying || data.length === 0) return;
+        if (data.length === 0) return;
 
-        if (hasTimestamps && duration > 0) {
-            // TIME-BASED PLAYBACK (New)
-            playbackTimeRef.current += (delta * 1000) * speed;
+        let currentTime = playbackTimeRef.current;
 
-            if (playbackTimeRef.current > duration) {
-                playbackTimeRef.current = playbackTimeRef.current % duration;
+        // Handle Manual Scrubbing
+        if (manualTime !== null && manualTime !== undefined) {
+            currentTime = manualTime;
+            playbackTimeRef.current = manualTime;
+        }
+        // Handle Playback
+        else if (isPlaying) {
+            if (hasTimestamps && duration > 0) {
+                currentTime += (delta * 1000) * speed;
+                if (currentTime > duration) currentTime = currentTime % duration;
+            } else {
+                // Legacy playback
+                currentTime += delta * speed;
+                if (currentTime > 0.033) { // ~30fps
+                    frameIndexRef.current = (frameIndexRef.current + 1) % data.length;
+                    currentTime = 0;
+                }
             }
+            playbackTimeRef.current = currentTime;
+        }
 
-            const targetTime = startTime + playbackTimeRef.current;
+        // Notify parent of current time
+        if (onTimeUpdate) {
+            onTimeUpdate(currentTime);
+        }
+
+        // Find Frame
+        if (hasTimestamps && duration > 0) {
+            const targetTime = startTime + currentTime;
             const frame = data.find(f => f.timestamp >= targetTime) || data[data.length - 1];
-
             if (frame) setCurrentFrame(frame);
-
         } else {
-            // FRAME-BASED PLAYBACK (Legacy/Fallback)
-            // Advance frame every ~33ms (30fps)
-            playbackTimeRef.current += delta * speed;
-            if (playbackTimeRef.current > 0.033) {
-                frameIndexRef.current = (frameIndexRef.current + 1) % data.length;
-                playbackTimeRef.current = 0;
+            // Legacy
+            if (manualTime === null) { // Only update if not scrubbing (legacy scrubbing not fully supported yet)
                 setCurrentFrame(data[frameIndexRef.current]);
             }
         }
@@ -203,8 +261,22 @@ const ReplayScene = ({ data, isPlaying, speed = 1 }: { data: any[], isPlaying: b
 
 const AnalysisView: React.FC<AnalysisViewProps> = ({ recordedData = [] }) => {
     const [isPlaying, setIsPlaying] = useState(true);
+    const [sliderValue, setSliderValue] = useState(0);
+    const [isScrubbing, setIsScrubbing] = useState(false);
 
     const hasData = recordedData && recordedData.length > 0;
+
+    // Calculate duration for slider max
+    const duration = useMemo(() => {
+        if (!recordedData || recordedData.length < 2 || !recordedData[0].timestamp) return 0;
+        return recordedData[recordedData.length - 1].timestamp - recordedData[0].timestamp;
+    }, [recordedData]);
+
+    const formatTime = (ms: number) => {
+        const seconds = Math.floor(ms / 1000);
+        const decimals = Math.floor((ms % 1000) / 100);
+        return `${seconds}.${decimals}s`;
+    };
 
     return (
         <div className="space-y-6">
@@ -247,12 +319,45 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ recordedData = [] }) => {
                             </div>
                         </div>
 
-                        <Canvas camera={{ position: [0, 1, 3], fov: 50 }}>
+                        {/* Timeline Controls */}
+                        <div className="absolute bottom-4 left-4 right-4 z-10 bg-black/60 p-4 rounded-lg backdrop-blur-sm flex items-center gap-4">
+                            <span className="text-white font-mono text-sm w-16 text-right">
+                                {formatTime(sliderValue)}
+                            </span>
+                            <Slider
+                                value={[sliderValue]}
+                                max={duration || 100}
+                                step={10}
+                                className="flex-1"
+                                onValueChange={(vals) => {
+                                    setIsScrubbing(true);
+                                    setSliderValue(vals[0]);
+                                    setIsPlaying(false); // Pause while scrubbing
+                                }}
+                                onValueCommit={() => {
+                                    setIsScrubbing(false);
+                                    // Optional: Resume playing if it was playing before? 
+                                    // For now let's leave it paused or let user press play
+                                }}
+                            />
+                            <span className="text-white/50 font-mono text-sm w-16">
+                                {formatTime(duration)}
+                            </span>
+                        </div>
+
+                        <Canvas camera={{ position: [0, 1.5, 4], fov: 50 }}>
                             <color attach="background" args={['#111']} />
                             <ambientLight intensity={0.5} />
                             <directionalLight position={[10, 10, 5]} intensity={1} />
 
-                            <ReplayScene data={recordedData} isPlaying={isPlaying} />
+                            <ReplayScene
+                                data={recordedData}
+                                isPlaying={isPlaying}
+                                manualTime={isScrubbing ? sliderValue : null}
+                                onTimeUpdate={(t) => {
+                                    if (!isScrubbing) setSliderValue(t);
+                                }}
+                            />
 
                             <Grid infiniteGrid fadeDistance={30} sectionColor="#444" cellColor="#222" />
 
