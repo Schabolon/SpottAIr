@@ -47,6 +47,7 @@ export interface ExerciseState {
     feedback: string[];
     isGoodRep: boolean; // Was the current/last rep good?
     badPoints: number[]; // Indices of landmarks to highlight
+    lastRepDuration?: number; // Duration of the last rep in seconds
 }
 
 export interface ExerciseProcessor {
@@ -60,7 +61,8 @@ export abstract class BaseExerciseProcessor implements ExerciseProcessor {
         phase: 'start',
         feedback: [],
         isGoodRep: true,
-        badPoints: []
+        badPoints: [],
+        lastRepDuration: 0
     };
 
     reset() {
@@ -69,7 +71,8 @@ export abstract class BaseExerciseProcessor implements ExerciseProcessor {
             phase: 'start',
             feedback: [],
             isGoodRep: true,
-            badPoints: []
+            badPoints: [],
+            lastRepDuration: 0
         };
     }
 

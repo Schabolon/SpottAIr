@@ -75,6 +75,7 @@ export class SquatProcessor extends BaseExerciseProcessor {
     }
 
     private minKneeAngle = 180; // Track deepest point
+    private repStartTime = 0; // Track when the rep started
 
     countReps(landmarks: Landmark[], isGoodForm: boolean): void {
         const leftHip = landmarks[PoseLandmarkIndex.LEFT_HIP];
@@ -112,6 +113,7 @@ export class SquatProcessor extends BaseExerciseProcessor {
                 this.state.phase = 'down';
                 this.state.isGoodRep = isGoodForm; // Start tracking rep quality
                 this.minKneeAngle = 180; // Reset tracker
+                this.repStartTime = Date.now(); // Start timer
             } else if (isStanding && this.minKneeAngle < 140) {
                 // If we went down significantly (e.g. < 140) but not enough to trigger rep (< 110)
                 // and are now back up, give feedback.
@@ -136,6 +138,7 @@ export class SquatProcessor extends BaseExerciseProcessor {
                 this.state.phase = 'up';
                 if (this.state.isGoodRep) {
                     this.state.reps += 1;
+                    this.state.lastRepDuration = (Date.now() - this.repStartTime) / 1000;
                 }
                 this.minKneeAngle = 180; // Reset for next rep
             }

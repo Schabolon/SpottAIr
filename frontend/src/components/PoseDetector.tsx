@@ -24,7 +24,8 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
         phase: 'start',
         feedback: [],
         isGoodRep: true,
-        badPoints: []
+        badPoints: [],
+        lastRepDuration: 0
     });
 
     const isExerciseActiveRef = useRef(isExerciseActive);
@@ -269,6 +270,11 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
                         }`}>
                         {exerciseState.reps} <span className="text-4xl text-gray-400">/ {targetReps}</span>
                     </div>
+                    {exerciseState.reps > 0 && (
+                        <div className="mt-2 text-center text-gray-700 dark:text-gray-200 font-bold text-xl">
+                            Last Rep: {exerciseState.lastRepDuration?.toFixed(1) || '0.0'}s
+                        </div>
+                    )}
                 </div>
 
                 {/* Feedback */}
