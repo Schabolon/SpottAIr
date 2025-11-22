@@ -7,6 +7,7 @@ import { getProcessor } from '../lib/exercises/registry';
 import { ExerciseState } from '../lib/exercises/types';
 import { useSpottair } from '@/lib/spottair';
 import * as tf from '@tensorflow/tfjs';
+import useAudioPlayer from '@/lib/audio'; // Add this import
 
 interface PoseDetectorProps {
     exerciseId?: string;
@@ -22,6 +23,8 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'squats', targ
     const [isExerciseActive, setIsExerciseActive] = useState(false);
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [countdownValue, setCountdownValue] = useState(3);
+
+  const { playAudioFromCategory, isPlaying: isAudioPlaying, isOnCooldown: isAudioOnCooldown, cleanup: cleanupAudio } = useAudioPlayer(3000);
 
     // Exercise State
     const [poseState, setPoseState] = useState<ExerciseState>({
@@ -206,7 +209,29 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'squats', targ
     const pendingClassRef = useRef<string | null>(null);
     const currentFeedbackClassRef = useRef<string>('correct'); // Ref to track current state without dependency issues
 
-    const onResults = (results: Results) => {
+  useEffect(() => {
+    // Only play audio when exercise is active
+    if (!isExerciseActive) return;
+
+    // Map AI model classes to audio categories
+    // Based on: const classes = ["correct", "feet_wide", "knees_caved", "spine_misalignment"]
+    const classToAudioCategory: Record<string, string> = {
+      'feet_wide': 'feet',           // feet_wide → play from feet audio folder
+      'knees_caved': 'knee',          // knees_caved → play from knee audio folder
+      'spine_misalignment': 'spine'   // spine_misalignment → play from spine audio folder
+    };
+
+    const audioCategory = classToAudioCategory[currentFeedbackClass];
+
+    // Play audio only when we detect an error class (not 'correct' or 'not_visible')
+    if (audioCategory && !isAudioPlaying && !isAudioOnCooldown) {
+      console.log(`🔊 AI detected: ${currentFeedbackClass} → Playing audio: ${audioCategory}`);
+      playAudioFromCategory(audioCategory);
+    }
+  }, [currentFeedbackClass, isExerciseActive, playAudioFromCategory, isAudioPlaying, isAudioOnCooldown]);
+
+
+  const onResults = (results: Results) => {
         if (!canvasRef.current || !webcamRef.current || !webcamRef.current.video) return;
 
         // ✅ Check if we have landmarks AND model is ready before running inference
@@ -425,6 +450,7 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'squats', targ
     // Cleanup on unmount
     useEffect(() => {
         return () => {
+          cleanupAudio(); // ✅ Clean up audio player
             console.log("Cleaning up PoseDetector...");
             if (webcamRef.current && webcamRef.current.video && webcamRef.current.video.srcObject) {
                 const stream = webcamRef.current.video.srcObject as MediaStream;
