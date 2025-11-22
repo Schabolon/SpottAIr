@@ -41,6 +41,14 @@ export enum PoseLandmarkIndex {
     RIGHT_FOOT_INDEX = 32,
 }
 
+export interface RepHistory {
+    duration: number;
+    feedback: string[];
+    startAngles?: Record<string, number>;
+    minAngles?: Record<string, number>;
+    isValid: boolean;
+}
+
 export interface ExerciseState {
     reps: number;
     phase: 'start' | 'down' | 'up';
@@ -48,6 +56,7 @@ export interface ExerciseState {
     isGoodRep: boolean; // Was the current/last rep good?
     badPoints: number[]; // Indices of landmarks to highlight
     lastRepDuration?: number; // Duration of the last rep in seconds
+    history: RepHistory[]; // History of all reps
 }
 
 export interface ExerciseProcessor {
@@ -62,7 +71,8 @@ export abstract class BaseExerciseProcessor implements ExerciseProcessor {
         feedback: [],
         isGoodRep: true,
         badPoints: [],
-        lastRepDuration: 0
+        lastRepDuration: 0,
+        history: []
     };
 
     reset() {
@@ -72,7 +82,8 @@ export abstract class BaseExerciseProcessor implements ExerciseProcessor {
             feedback: [],
             isGoodRep: true,
             badPoints: [],
-            lastRepDuration: 0
+            lastRepDuration: 0,
+            history: []
         };
     }
 

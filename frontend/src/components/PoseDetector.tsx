@@ -5,6 +5,7 @@ import { Pose, POSE_CONNECTIONS, type Results } from '@mediapipe/pose';
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { getProcessor } from '../lib/exercises/registry';
 import { ExerciseState } from '../lib/exercises/types';
+import ReactMarkdown from 'react-markdown';
 
 interface PoseDetectorProps {
     exerciseId?: string;
@@ -16,18 +17,66 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
     const webcamRef = useRef<Webcam>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isExerciseActive, setIsExerciseActive] = useState(false);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [analysisResult, setAnalysisResult] = useState<string | null>(null);
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [countdownValue, setCountdownValue] = useState(3);
 
     // Exercise State
-    const [exerciseState, setExerciseState] = useState<ExerciseState>({
+    const [poseState, setPoseState] = useState<ExerciseState>({
         reps: 0,
         phase: 'start',
         feedback: [],
         isGoodRep: true,
         badPoints: [],
-        lastRepDuration: 0
+        lastRepDuration: 0,
+        history: []
     });
+
+    useEffect(() => {
+        if (poseState.reps >= targetReps && isExerciseActive && !isAnalyzing) {
+            setIsExerciseActive(false);
+            setIsAnalyzing(true);
+
+            // Prepare session data
+            const sessionData = {
+                exercise_name: exerciseId,
+                total_reps: poseState.reps,
+                reps: poseState.history.map(h => ({
+                    duration: h.duration,
+                    feedback: h.feedback,
+                    min_angles: h.minAngles,
+                    is_valid: h.isValid,
+                    start_angles: h.startAngles
+                }))
+            };
+
+            // Call API
+            fetch('http://localhost:8000/api/v1/route', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_data: sessionData
+                })
+            })
+                .then(async res => {
+                    if (!res.ok) {
+                        const errText = await res.text();
+                        throw new Error(`API Error: ${res.status} ${errText}`);
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    setAnalysisResult(data.text);
+                    setIsAnalyzing(false);
+                })
+                .catch(err => {
+                    console.error("Analysis failed", err);
+                    setAnalysisResult(`Error: ${err.message}`);
+                    setIsAnalyzing(false);
+                });
+        }
+    }, [poseState.reps, targetReps, isExerciseActive, isAnalyzing, exerciseId, poseState.history]);
 
     const isExerciseActiveRef = useRef(isExerciseActive);
     const isCountingDownRef = useRef(isCountingDown);
@@ -48,12 +97,14 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
     useEffect(() => {
         exerciseIdRef.current = exerciseId;
         processorRef.current = getProcessor(exerciseId);
-        setExerciseState({
+        setPoseState({
             reps: 0,
             phase: 'start',
             feedback: [],
             isGoodRep: true,
-            badPoints: []
+            badPoints: [],
+            lastRepDuration: 0,
+            history: []
         });
     }, [exerciseId]);
 
@@ -70,7 +121,7 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
             // Start recording
             currentRecordingRef.current = [];
             processorRef.current.reset();
-            setExerciseState(prev => ({ ...prev, reps: 0 }));
+            setPoseState(prev => ({ ...prev, reps: 0 }));
         }
         return () => clearInterval(interval);
     }, [isCountingDown, countdownValue]);
@@ -86,12 +137,14 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
                 onRecordingComplete(currentRecordingRef.current);
             }
             processorRef.current.reset();
-            setExerciseState({
+            setPoseState({
                 reps: 0,
                 phase: 'start',
                 feedback: [],
                 isGoodRep: true,
-                badPoints: []
+                badPoints: [],
+                lastRepDuration: 0,
+                history: []
             });
         } else {
             setIsCountingDown(true);
@@ -137,7 +190,7 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
                 // Update state for UI (throttling might be needed for performance, but React handles it okay usually)
                 // We use a ref for immediate drawing, but state for UI
                 // To avoid too many re-renders, we could throttle this setExerciseState
-                setExerciseState(processedState);
+                setPoseState(processedState);
 
                 // Draw User Skeleton
                 drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {
@@ -286,11 +339,15 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
             {/* Sidebar Stats */}
             <div className="w-full lg:w-[320px] flex flex-col gap-4">
                 {/* Rep Counter */}
-                <div className="relative overflow-hidden p-6 rounded-3xl shadow-sm border bg-card text-card-foreground">
-                    <h2 className="text-base font-semibold mb-2 flex items-center gap-2">Current Reps</h2>
+                <div className={`relative overflow-hidden p-8 rounded-3xl shadow-lg border transition-all duration-500 ${poseState.isGoodRep
+                    ? 'bg-gradient-to-br from-green-500/10 to-emerald-500/5 border-green-500/20'
+                    : 'bg-gradient-to-br from-yellow-500/10 to-orange-500/5 border-yellow-500/20'
+                    }`}>
+                    <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Current Reps</h2>
                     <div className="flex items-baseline gap-2">
-                        <span className="text-7xl font-bold tracking-tight">
-                            {exerciseState.reps}
+                        <span className={`text-8xl font-black tracking-tighter ${poseState.isGoodRep ? 'text-green-500' : 'text-yellow-500'
+                            }`}>
+                            {poseState.reps}
                         </span>
                         <span className="text-2xl font-light text-muted-foreground">/ {targetReps}</span>
                     </div>
@@ -298,13 +355,13 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
                     {/* Progress Bar */}
                     <div className="absolute bottom-0 left-0 w-full h-1 bg-muted">
                         <div
-                            className="h-full transition-all duration-500 bg-primary"
-                            style={{ width: `${Math.min((exerciseState.reps / targetReps) * 100, 100)}%` }}
+                            className={`h-full transition-all duration-500 ${poseState.isGoodRep ? 'bg-green-500' : 'bg-yellow-500'}`}
+                            style={{ width: `${Math.min((poseState.reps / targetReps) * 100, 100)}%` }}
                         />
                     </div>
-                    {exerciseState.reps > 0 && (
-                        <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-                            <span className="font-medium text-foreground">Last Rep:</span> {exerciseState.lastRepDuration?.toFixed(1) || '0.0'}s
+                    {poseState.reps > 0 && (
+                        <div className="mt-2 text-center text-gray-700 dark:text-gray-200 font-bold text-xl">
+                            Last Rep: {poseState.lastRepDuration?.toFixed(1) || '0.0'}s
                         </div>
                     )}
                 </div>
@@ -319,9 +376,9 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
                     </h2>
 
                     <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-                        {exerciseState.feedback.length > 0 ? (
-                            exerciseState.feedback.map((msg, i) => (
-                                <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-red-500/5 border border-red-500/10 text-red-600 dark:text-red-400 animate-in slide-in-from-right-4 duration-300">
+                        {poseState.feedback.length > 0 ? (
+                            poseState.feedback.map((msg, i) => (
+                                <div key={i} className="flex items-start gap-3 p-4 rounded-2xl bg-red-500/5 border border-red-500/10 text-red-600 dark:text-red-400 animate-in slide-in-from-right-4 duration-300">
                                     <span className="text-xl mt-0.5">⚠️</span>
                                     <p className="font-medium leading-snug">{msg}</p>
                                 </div>
@@ -347,6 +404,49 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
                         )}
                     </div>
                 </div>
+                {/* Analysis Result Overlay */}
+                {(isAnalyzing || analysisResult) && (
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
+                        <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-2xl w-full shadow-2xl border border-gray-200 dark:border-gray-800">
+                            <h2 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-3">
+                                {isAnalyzing ? (
+                                    <>
+                                        <span className="animate-spin">⏳</span> Analyzing Performance...
+                                    </>
+                                ) : (
+                                    <>
+                                        <span>🤖</span> AI Coach Feedback
+                                    </>
+                                )}
+                            </h2>
+
+                            {isAnalyzing ? (
+                                <div className="space-y-4">
+                                    <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded animate-pulse w-3/4"></div>
+                                    <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded animate-pulse w-1/2"></div>
+                                    <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded animate-pulse w-5/6"></div>
+                                </div>
+                            ) : (
+                                <div className="prose dark:prose-invert max-h-[60vh] overflow-y-auto">
+                                    <div className="text-lg leading-relaxed">
+                                        <ReactMarkdown>{analysisResult || ''}</ReactMarkdown>
+                                    </div>
+                                    <div className="mt-8 flex justify-end">
+                                        <button
+                                            onClick={() => {
+                                                setAnalysisResult(null);
+                                                // Optional: Reset exercise here?
+                                            }}
+                                            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
