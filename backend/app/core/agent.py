@@ -5,10 +5,9 @@ from app.core.schemas import AgentParams, AgentResponse
 
 # Initialize LangChain Chat Model
 chat = ChatOpenAI(
-    model="gpt-4o",
-    api_key=os.environ.get("OPENAI_API_KEY"),
-    temperature=0.7
+    model="gpt-4o", api_key=os.environ.get("OPENAI_API_KEY"), temperature=0.7
 )
+
 
 async def analyze_pose(request: AgentParams) -> AgentResponse:
     instruction = (
@@ -17,7 +16,9 @@ async def analyze_pose(request: AgentParams) -> AgentResponse:
     )
 
     messages = [
-        SystemMessage(content="You are an expert fitness coach and biomechanics specialist. Analyze the provided image containing a 3D pose."),
+        SystemMessage(
+            content="You are an expert fitness coach and biomechanics specialist. Analyze the provided image containing a 3D pose."
+        ),
     ]
 
     user_content = []
@@ -30,7 +31,7 @@ async def analyze_pose(request: AgentParams) -> AgentResponse:
         )
 
     user_content.append({"type": "text", "text": instruction})
-    
+
     messages.append(HumanMessage(content=user_content))
 
     response = await chat.ainvoke(messages)
