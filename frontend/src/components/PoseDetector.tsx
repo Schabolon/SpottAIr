@@ -5,7 +5,6 @@ import { Pose, POSE_CONNECTIONS, type Results } from '@mediapipe/pose';
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { getProcessor } from '../lib/exercises/registry';
 import { ExerciseState } from '../lib/exercises/types';
-import ReactMarkdown from 'react-markdown';
 import { useSpottair } from '@/lib/spottair';
 import * as tf from '@tensorflow/tfjs';
 
@@ -13,14 +12,14 @@ interface PoseDetectorProps {
     exerciseId?: string;
     targetReps?: number;
     onRecordingComplete?: (data: any[]) => void;
+    onAnalysisComplete?: (feedback: string) => void;
+    onAnalysisStart?: () => void;
 }
 
-const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', targetReps = 10, onRecordingComplete }) => {
+const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'squats', targetReps = 10, onRecordingComplete, onAnalysisComplete, onAnalysisStart }) => {
     const webcamRef = useRef<Webcam>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isExerciseActive, setIsExerciseActive] = useState(false);
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [analysisResult, setAnalysisResult] = useState<string | null>(null);
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [countdownValue, setCountdownValue] = useState(3);
 
@@ -31,54 +30,65 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
         feedback: [],
         isGoodRep: true,
         badPoints: [],
-        lastRepDuration: 0,
         history: []
     });
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+
+    // Trigger Analysis when target reps reached
     useEffect(() => {
         if (poseState.reps >= targetReps && isExerciseActive && !isAnalyzing) {
-            setIsExerciseActive(false);
-            setIsAnalyzing(true);
+            const stopAndAnalyze = async () => {
+                setIsExerciseActive(false);
+                setIsAnalyzing(true);
+                if (onAnalysisStart) onAnalysisStart();
 
-            // Prepare session data
-            const sessionData = {
-                exercise_name: exerciseId,
-                total_reps: poseState.reps,
-                reps: poseState.history.map(h => ({
-                    duration: h.duration,
-                    feedback: h.feedback,
-                    min_angles: h.minAngles,
-                    is_valid: h.isValid,
-                    start_angles: h.startAngles
-                }))
-            };
+                // Prepare session data
+                const sessionData = {
+                    exercise_name: exerciseId,
+                    total_reps: poseState.reps,
+                    reps: poseState.history.map(h => ({
+                        duration: h.duration,
+                        feedback: h.feedback,
+                        start_angles: h.startAngles,
+                        min_angles: h.minAngles,
+                        metrics: h.metrics,
+                        is_valid: h.isValid
+                    }))
+                };
 
-            // Call API
-            fetch('http://localhost:8000/api/v1/route', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    session_data: sessionData
-                })
-            })
-                .then(async res => {
-                    if (!res.ok) {
-                        const errText = await res.text();
-                        throw new Error(`API Error: ${res.status} ${errText}`);
+                try {
+                    const response = await fetch('/api/v1/route', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            instruction: "Analyze this squat session.",
+                            session_data: sessionData
+                        }),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`API Error: ${response.statusText}`);
                     }
-                    return res.json();
-                })
-                .then(data => {
-                    setAnalysisResult(data.text);
+
+                    const data = await response.json();
+                    if (onAnalysisComplete) {
+                        onAnalysisComplete(data.text);
+                    }
+                    if (onRecordingComplete) {
+                        onRecordingComplete(currentRecordingRef.current);
+                    }
+                } catch (error) {
+                    console.error("Analysis failed:", error);
+                } finally {
                     setIsAnalyzing(false);
-                })
-                .catch(err => {
-                    console.error("Analysis failed", err);
-                    setAnalysisResult(`Error: ${err.message}`);
-                    setIsAnalyzing(false);
-                });
+                }
+            };
+            stopAndAnalyze();
         }
-    }, [poseState.reps, targetReps, isExerciseActive, isAnalyzing, exerciseId, poseState.history]);
+    }, [poseState.reps, targetReps, isExerciseActive, isAnalyzing, exerciseId, poseState.history, onAnalysisComplete, onRecordingComplete]);
 
     const isExerciseActiveRef = useRef(isExerciseActive);
     const isCountingDownRef = useRef(isCountingDown);
@@ -89,12 +99,12 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
     const currentRecordingRef = useRef<any[]>([]);
 
 
-  const modelRef = useRef<tf.GraphModel | null>(null);
+    const modelRef = useRef<tf.GraphModel | null>(null);
 
-  // Load SpottAIr model
-  const { model, isLoading, error, runInference } = useSpottair('/models/model.json', 'tflite');
+    // Load SpottAIr model
+    const { model, isLoading, runInference } = useSpottair('/models/model.json', 'tflite');
 
-  const isLoadingRef = useRef(isLoading);
+    const isLoadingRef = useRef(isLoading);
 
     useEffect(() => {
         isExerciseActiveRef.current = isExerciseActive;
@@ -118,13 +128,13 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
         });
     }, [exerciseId]);
 
-  useEffect(() => {
-    modelRef.current = model;
-  }, [model]);
+    useEffect(() => {
+        modelRef.current = model;
+    }, [model]);
 
-  useEffect(() => {
-    isLoadingRef.current = isLoading;
-  }, [isLoading]);
+    useEffect(() => {
+        isLoadingRef.current = isLoading;
+    }, [isLoading]);
 
     // Countdown timer logic
     useEffect(() => {
@@ -176,21 +186,21 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
 
         // ✅ Check if we have landmarks AND model is ready before running inference
         if (results.poseLandmarks && model && !isLoading) {
-          try {
-            const output = runInference(results.poseLandmarks);
-            if (output) {
-              console.log('SpottAIr Output:', output);
-              // TODO: Use the output for exercise classification or feedback
-            } else {
-              console.log('Inference returned null');
+            try {
+                const output = runInference(results.poseLandmarks);
+                if (output) {
+                    console.log('SpottAIr Output:', output);
+                    // TODO: Use the output for exercise classification or feedback
+                } else {
+                    console.log('Inference returned null');
+                }
+            } catch (err) {
+                console.error('Error running SpottAIr inference:', err);
             }
-          } catch (err) {
-            console.error('Error running SpottAIr inference:', err);
-          }
         } else {
-          // Debug: log why inference isn't running
-          if (!results.poseLandmarks) console.log('No pose landmarks detected');
-          if (!model) console.log('Model not ready');
+            // Debug: log why inference isn't running
+            if (!results.poseLandmarks) console.log('No pose landmarks detected');
+            if (!model) console.log('Model not ready');
         }
 
         const videoWidth = webcamRef.current.video.videoWidth;
@@ -266,9 +276,9 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
 
     // Initialize Pose instance once
     useEffect(() => {
-      if (isLoading || !model) {
-        return;
-      }
+        if (isLoading || !model) {
+            return;
+        }
         const pose = new Pose({
             locateFile: (file) => {
                 return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
@@ -292,7 +302,7 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
         };
     }, [model, isLoading]);
 
-  // Control the detection loop based on active state
+    // Control the detection loop based on active state
     useEffect(() => {
         const detectPose = async () => {
             if (
@@ -470,49 +480,6 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', tar
                         )}
                     </div>
                 </div>
-                {/* Analysis Result Overlay */}
-                {(isAnalyzing || analysisResult) && (
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
-                        <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-2xl w-full shadow-2xl border border-gray-200 dark:border-gray-800">
-                            <h2 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-3">
-                                {isAnalyzing ? (
-                                    <>
-                                        <span className="animate-spin">⏳</span> Analyzing Performance...
-                                    </>
-                                ) : (
-                                    <>
-                                        <span>🤖</span> AI Coach Feedback
-                                    </>
-                                )}
-                            </h2>
-
-                            {isAnalyzing ? (
-                                <div className="space-y-4">
-                                    <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded animate-pulse w-3/4"></div>
-                                    <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded animate-pulse w-1/2"></div>
-                                    <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded animate-pulse w-5/6"></div>
-                                </div>
-                            ) : (
-                                <div className="prose dark:prose-invert max-h-[60vh] overflow-y-auto">
-                                    <div className="text-lg leading-relaxed">
-                                        <ReactMarkdown>{analysisResult || ''}</ReactMarkdown>
-                                    </div>
-                                    <div className="mt-8 flex justify-end">
-                                        <button
-                                            onClick={() => {
-                                                setAnalysisResult(null);
-                                                // Optional: Reset exercise here?
-                                            }}
-                                            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors"
-                                        >
-                                            Close
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );
