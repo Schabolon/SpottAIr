@@ -11,6 +11,14 @@ const ExerciseDetail: React.FC = () => {
     const navigate = useNavigate();
     const exerciseTitle = id ? id.charAt(0).toUpperCase() + id.slice(1) : 'Exercise';
 
+    // State to store recorded pose data
+    const [recordedData, setRecordedData] = React.useState<any[]>([]);
+
+    const handleRecordingComplete = (data: any[]) => {
+        console.log("Recording complete, frames:", data.length);
+        setRecordedData(data);
+    };
+
     return (
         <div className="min-h-screen bg-background p-4 md:p-8">
             <div className="max-w-6xl mx-auto">
@@ -29,12 +37,15 @@ const ExerciseDetail: React.FC = () => {
 
                     <TabsContent value="train" className="mt-0">
                         <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-                            <PoseDetector exerciseId={id || 'unknown'} />
+                            <PoseDetector
+                                exerciseId={id || 'unknown'}
+                                onRecordingComplete={handleRecordingComplete}
+                            />
                         </div>
                     </TabsContent>
 
                     <TabsContent value="analyze" className="mt-0">
-                        <AnalysisView />
+                        <AnalysisView recordedData={recordedData} />
                     </TabsContent>
                 </Tabs>
             </div>

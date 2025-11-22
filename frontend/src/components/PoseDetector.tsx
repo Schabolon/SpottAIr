@@ -6,9 +6,10 @@ import { Camera } from '@mediapipe/camera_utils';
 
 interface PoseDetectorProps {
     exerciseId?: string;
+    onRecordingComplete?: (data: any[]) => void;
 }
 
-const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown' }) => {
+const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown', onRecordingComplete }) => {
     const webcamRef = useRef<Webcam>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isExerciseActive, setIsExerciseActive] = useState(false);
@@ -18,6 +19,9 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown' }) =
     const isExerciseActiveRef = useRef(isExerciseActive);
     const isCountingDownRef = useRef(isCountingDown);
     const exerciseIdRef = useRef(exerciseId);
+
+    // Recording Ref
+    const currentRecordingRef = useRef<any[]>([]);
 
     useEffect(() => {
         isExerciseActiveRef.current = isExerciseActive;
@@ -41,6 +45,8 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown' }) =
         } else if (isCountingDown && countdownValue === 0) {
             setIsCountingDown(false);
             setIsExerciseActive(true);
+            // Start recording
+            currentRecordingRef.current = [];
         }
         return () => clearInterval(interval);
     }, [isCountingDown, countdownValue]);
@@ -50,9 +56,15 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown' }) =
             setIsExerciseActive(false);
             setIsCountingDown(false);
             setCountdownValue(3);
+
+            // Stop recording and send data
+            if (onRecordingComplete && currentRecordingRef.current.length > 0) {
+                onRecordingComplete(currentRecordingRef.current);
+            }
         } else {
             setIsCountingDown(true);
             setCountdownValue(3);
+            currentRecordingRef.current = []; // Reset on start
         }
     };
 
@@ -156,6 +168,17 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown' }) =
 
             // Only draw skeleton if exercise is active AND we are NOT counting down
             if (results.poseLandmarks && isExerciseActiveRef.current && !isCountingDownRef.current) {
+
+                // RECORD DATA
+                // Prefer poseWorldLandmarks for 3D, fallback to poseLandmarks
+                const frameData = results.poseWorldLandmarks || results.poseLandmarks;
+                if (frameData) {
+                    currentRecordingRef.current.push({
+                        timestamp: Date.now(),
+                        landmarks: frameData
+                    });
+                }
+
                 const badPoints = checkPose(results.poseLandmarks);
 
                 // Draw User Skeleton
