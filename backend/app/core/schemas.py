@@ -1,5 +1,17 @@
 from pydantic import BaseModel
-from typing import List, Tuple
+from typing import List
+
+
+class Landmark(BaseModel):
+    x: float
+    y: float
+    z: float
+    visibility: float
+    presence: float
+
+
+class PoseLandmarkerResult(BaseModel):
+    landmarks: List[Landmark]
 
 
 class AgentResponse(BaseModel):
@@ -7,4 +19,6 @@ class AgentResponse(BaseModel):
 
 
 class AgentParams(BaseModel):
-    points: List[List[Tuple[float]]]
+    frames: List[PoseLandmarkerResult] | None = None
+    instruction: str | None = None
+    image: str | None = None
