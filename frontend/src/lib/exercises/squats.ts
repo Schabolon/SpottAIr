@@ -18,6 +18,11 @@ export class SquatProcessor extends BaseExerciseProcessor {
         const rightKnee = landmarks[PoseLandmarkIndex.RIGHT_KNEE];
         const leftAnkle = landmarks[PoseLandmarkIndex.LEFT_ANKLE];
         const rightAnkle = landmarks[PoseLandmarkIndex.RIGHT_ANKLE];
+        const nose = landmarks[PoseLandmarkIndex.NOSE];
+        const leftWrist = landmarks[PoseLandmarkIndex.LEFT_WRIST];
+        const rightWrist = landmarks[PoseLandmarkIndex.RIGHT_WRIST];
+        const leftShoulder = landmarks[PoseLandmarkIndex.LEFT_SHOULDER];
+        const rightShoulder = landmarks[PoseLandmarkIndex.RIGHT_SHOULDER];
 
         // Basic visibility check
         const minVisibility = 0.5;
@@ -27,13 +32,43 @@ export class SquatProcessor extends BaseExerciseProcessor {
             return { isGoodForm: false, feedback: ["Body not fully visible"], badPoints: [] };
         }
 
-        // Knees caving in (Valgus)
+        // 1. Knees caving in (Valgus)
         const hipWidth = Math.abs(leftHip.x - rightHip.x);
         const kneeWidth = Math.abs(leftKnee.x - rightKnee.x);
         if (kneeWidth < hipWidth * 0.8) {
-            feedback.push("Knees caving in!");
+            feedback.push("Push your knees out!");
             badPoints.push(PoseLandmarkIndex.LEFT_KNEE, PoseLandmarkIndex.RIGHT_KNEE);
             isGoodForm = false;
+        }
+
+        // 2. Hands above head check
+        // Y increases downwards, so smaller Y is higher
+        if (nose && leftWrist && rightWrist) {
+            if (leftWrist.y < nose.y || rightWrist.y < nose.y) {
+                feedback.push("Lower your hands!");
+                badPoints.push(PoseLandmarkIndex.LEFT_WRIST, PoseLandmarkIndex.RIGHT_WRIST);
+                isGoodForm = false;
+            }
+        }
+
+        // 3. Foot placement (Stance width)
+        // Feet should be roughly shoulder width apart
+        if (leftShoulder && rightShoulder) {
+            const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
+            const ankleWidth = Math.abs(leftAnkle.x - rightAnkle.x);
+
+            // Too narrow (< 80% shoulder width)
+            if (ankleWidth < shoulderWidth * 0.8) {
+                feedback.push("Widen your stance!");
+                badPoints.push(PoseLandmarkIndex.LEFT_ANKLE, PoseLandmarkIndex.RIGHT_ANKLE);
+                isGoodForm = false;
+            }
+            // Too wide (> 150% shoulder width)
+            else if (ankleWidth > shoulderWidth * 1.5) {
+                feedback.push("Narrow your stance!");
+                badPoints.push(PoseLandmarkIndex.LEFT_ANKLE, PoseLandmarkIndex.RIGHT_ANKLE);
+                isGoodForm = false;
+            }
         }
 
         return { isGoodForm, feedback, badPoints };
