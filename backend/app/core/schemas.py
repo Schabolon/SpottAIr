@@ -19,4 +19,6 @@ class AgentResponse(BaseModel):
 
 
 class AgentParams(BaseModel):
-    frames: List[PoseLandmarkerResult]
+    frames: List[PoseLandmarkerResult] | None = None
+    instruction: str | None = None
+    image: str | None = None
