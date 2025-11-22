@@ -89,6 +89,8 @@ const FPSControls = () => {
 const Skeleton = ({ landmarks }: { landmarks: any[] }) => {
     if (!landmarks || landmarks.length === 0) return null;
 
+    const VISIBILITY_THRESHOLD = 0.5;
+
     // Convert landmarks to Vector3
     // MediaPipe world landmarks: x (right), y (up), z (forward/backward)
     // We might need to scale/invert axes to match Three.js coordinate system
@@ -129,19 +131,27 @@ const Skeleton = ({ landmarks }: { landmarks: any[] }) => {
     return (
         <group>
             {/* Joints */}
-            {points.map((pos: THREE.Vector3, i: number) => (
-                <mesh key={i} position={pos}>
-                    <sphereGeometry args={[0.015, 16, 16]} />
-                    <meshStandardMaterial color="hotpink" />
-                </mesh>
-            ))}
+            {points.map((pos: THREE.Vector3, i: number) => {
+                const isVisible = (landmarks[i].visibility ?? 1) > VISIBILITY_THRESHOLD;
+                if (!isVisible) return null;
+
+                return (
+                    <mesh key={i} position={pos}>
+                        <sphereGeometry args={[0.015, 16, 16]} />
+                        <meshStandardMaterial color="hotpink" />
+                    </mesh>
+                );
+            })}
 
             {/* Bones */}
             {POSE_CONNECTIONS.map(([start, end], i) => {
                 const startPoint = points[start];
                 const endPoint = points[end];
 
-                if (!startPoint || !endPoint) return null;
+                const startVisible = (landmarks[start]?.visibility ?? 1) > VISIBILITY_THRESHOLD;
+                const endVisible = (landmarks[end]?.visibility ?? 1) > VISIBILITY_THRESHOLD;
+
+                if (!startPoint || !endPoint || !startVisible || !endVisible) return null;
 
                 const direction = new THREE.Vector3().subVectors(endPoint, startPoint);
                 const length = direction.length();
