@@ -78,6 +78,18 @@ export class SquatProcessor extends BaseExerciseProcessor {
     private startKneeAngle = 180; // Track angle at start of rep
     private repStartTime = 0; // Track when the rep started
 
+    // Metrics tracking
+    private descentStartTime = 0;
+    private bottomTime = 0;
+    private hipStartX = 0;
+    private maxHipSway = 0;
+    private maxTorsoAngle = 0;
+    private maxKneeDiff = 0;
+
+    private getVerticalAngle(top: Landmark, bottom: Landmark): number {
+        return Math.abs(Math.atan2(top.x - bottom.x, top.y - bottom.y) * 180.0 / Math.PI);
+    }
+
     countReps(landmarks: Landmark[], isGoodForm: boolean): void {
         const leftHip = landmarks[PoseLandmarkIndex.LEFT_HIP];
         const rightHip = landmarks[PoseLandmarkIndex.RIGHT_HIP];
@@ -85,9 +97,11 @@ export class SquatProcessor extends BaseExerciseProcessor {
         const rightKnee = landmarks[PoseLandmarkIndex.RIGHT_KNEE];
         const leftAnkle = landmarks[PoseLandmarkIndex.LEFT_ANKLE];
         const rightAnkle = landmarks[PoseLandmarkIndex.RIGHT_ANKLE];
+        const leftShoulder = landmarks[PoseLandmarkIndex.LEFT_SHOULDER];
+        const rightShoulder = landmarks[PoseLandmarkIndex.RIGHT_SHOULDER];
 
         const minVisibility = 0.5;
-        const points = [leftHip, rightHip, leftKnee, rightKnee, leftAnkle, rightAnkle];
+        const points = [leftHip, rightHip, leftKnee, rightKnee, leftAnkle, rightAnkle, leftShoulder, rightShoulder];
 
         if (points.some(p => !p || (p.visibility !== undefined && p.visibility < minVisibility))) return;
 
@@ -96,6 +110,17 @@ export class SquatProcessor extends BaseExerciseProcessor {
         const rightKneeAngle = this.getAngle(rightHip, rightKnee, rightAnkle);
         const avgKneeAngle = (leftKneeAngle + rightKneeAngle) / 2;
 
+        // Calculate metrics
+        const kneeDiff = Math.abs(leftKneeAngle - rightKneeAngle);
+
+        // Torso angle (lean forward)
+        const leftTorsoAngle = this.getVerticalAngle(leftShoulder, leftHip);
+        const rightTorsoAngle = this.getVerticalAngle(rightShoulder, rightHip);
+        const avgTorsoAngle = (leftTorsoAngle + rightTorsoAngle) / 2;
+
+        // Hip sway (center x)
+        const hipCenter = (leftHip.x + rightHip.x) / 2;
+
         // Check depth
         // Relaxed threshold: < 110 degrees is acceptable
         const isDeep = avgKneeAngle < 110;
@@ -103,6 +128,29 @@ export class SquatProcessor extends BaseExerciseProcessor {
         // Check standing
         // > 160 degrees is standing straight
         const isStanding = avgKneeAngle > 160;
+
+        // Start of descent detection (when standing and starting to bend)
+        if (this.state.phase === 'start' || this.state.phase === 'up') {
+            if (avgKneeAngle < 170 && this.descentStartTime === 0) {
+                this.descentStartTime = Date.now();
+                this.hipStartX = hipCenter;
+                this.maxHipSway = 0;
+                this.maxTorsoAngle = 0;
+                this.maxKneeDiff = 0;
+            }
+
+            // Reset if we go back to fully standing without rep
+            if (avgKneeAngle > 175) {
+                this.descentStartTime = 0;
+            }
+        }
+
+        // Track metrics during movement
+        if (this.descentStartTime > 0) {
+            this.maxKneeDiff = Math.max(this.maxKneeDiff, kneeDiff);
+            this.maxTorsoAngle = Math.max(this.maxTorsoAngle, avgTorsoAngle);
+            this.maxHipSway = Math.max(this.maxHipSway, Math.abs(hipCenter - this.hipStartX));
+        }
 
         if (this.state.phase === 'start' || this.state.phase === 'up') {
             // Track minimum angle during non-rep phases to detect "almost" reps
@@ -116,23 +164,20 @@ export class SquatProcessor extends BaseExerciseProcessor {
                 this.minKneeAngle = avgKneeAngle; // Initialize with current angle
                 this.startKneeAngle = avgKneeAngle; // Track start angle
                 this.repStartTime = Date.now(); // Start timer
+                this.bottomTime = Date.now(); // Mark bottom time
             } else if (isStanding && this.minKneeAngle < 140) {
                 // If we went down significantly (e.g. < 140) but not enough to trigger rep (< 110)
                 // and are now back up, give feedback.
-                // Only trigger if we haven't already triggered a rep (phase is start/up)
-
-                // Debounce/Check if we just finished a rep? 
-                // Actually, minKneeAngle should be reset on successful rep start.
-                // So if we are here, it means we went down and up WITHOUT triggering 'down'.
-
                 this.state.feedback.push(`Go lower! Reached ${Math.round(this.minKneeAngle)}°`);
                 this.minKneeAngle = 180; // Reset after feedback
+                this.descentStartTime = 0; // Reset metrics
             }
 
         } else if (this.state.phase === 'down') {
-            // Update minimum angle
+            // Update minimum angle and bottom time
             if (avgKneeAngle < this.minKneeAngle) {
                 this.minKneeAngle = avgKneeAngle;
+                this.bottomTime = Date.now();
             }
 
             // Update quality during the rep
@@ -143,32 +188,39 @@ export class SquatProcessor extends BaseExerciseProcessor {
             // Check if returned to standing
             if (isStanding) {
                 this.state.phase = 'up';
+                const now = Date.now();
+
+                // Calculate durations
+                // If descentStartTime wasn't captured correctly, fallback to repStartTime
+                const startT = this.descentStartTime > 0 ? this.descentStartTime : this.repStartTime;
+                const eccentricDur = (this.bottomTime - startT) / 1000;
+                const concentricDur = (now - this.bottomTime) / 1000;
+                const totalDur = (now - startT) / 1000;
+
+                const metrics = {
+                    "eccentric_duration": Math.max(0, eccentricDur),
+                    "concentric_duration": Math.max(0, concentricDur),
+                    "hip_sway": this.maxHipSway,
+                    "torso_angle": this.maxTorsoAngle,
+                    "knee_symmetry": this.maxKneeDiff
+                };
+
                 if (this.state.isGoodRep) {
                     this.state.reps += 1;
-                    const duration = (Date.now() - this.repStartTime) / 1000;
-                    this.state.lastRepDuration = duration;
+                    this.state.lastRepDuration = totalDur;
 
                     // Record history
                     this.state.history.push({
-                        duration: duration,
+                        duration: totalDur,
                         feedback: [...this.state.feedback], // Capture feedback at end of rep
                         minAngles: { "knee": this.minKneeAngle },
                         startAngles: { "knee": this.startKneeAngle },
+                        metrics: metrics,
                         isValid: true
                     });
                 } else {
-                    // Record failed rep? User only asked for "reps", implying successful ones?
-                    // But feedback on failed reps is useful. Let's record it but mark isValid=false
-                    // if we want to track failed attempts. For now, let's stick to counted reps
-                    // or maybe we should track everything.
-                    // The prompt says "Number of Reps" and "For each Rep".
-                    // Usually "Reps" means successful ones.
-                    // But "feedback given" implies we want to know about mistakes.
-                    // Let's record it if it was a "rep attempt" (went down and up).
-
-                    const duration = (Date.now() - this.repStartTime) / 1000;
                     this.state.history.push({
-                        duration: duration,
+                        duration: totalDur,
                         feedback: [...this.state.feedback],
                         minAngles: { "knee": this.minKneeAngle },
                         startAngles: { "knee": this.startKneeAngle },

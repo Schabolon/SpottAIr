@@ -46,6 +46,7 @@ export interface RepHistory {
     feedback: string[];
     startAngles?: Record<string, number>;
     minAngles?: Record<string, number>;
+    metrics?: Record<string, number | string>;
     isValid: boolean;
 }
 

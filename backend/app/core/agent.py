@@ -53,6 +53,11 @@ async def analyze_pose(request: AgentParams) -> AgentResponse:
                     f"  Highest Knee Angle (Start): "
                     f"{rep.start_angles['knee']:.1f} degrees\n"
                 )
+            if rep.metrics:
+                instruction += "  Metrics:\n"
+                for key, value in rep.metrics.items():
+                    val_str = f"{value:.2f}" if isinstance(value, float) else str(value)
+                    instruction += f"    - {key}: {val_str}\n"
             elif rep.min_angles:
                 instruction += f"  Depth (Min Angles): {rep.min_angles}\n"
 

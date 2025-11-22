@@ -23,6 +23,7 @@ class RepDetail(BaseModel):
     feedback: List[str]
     start_angles: dict[str, float] | None = None
     min_angles: dict[str, float] | None = None
+    metrics: dict[str, float | str] | None = None
     is_valid: bool
 
 
