@@ -2,6 +2,11 @@ import { BaseExerciseProcessor, Landmark, PoseLandmarkIndex } from './types';
 
 export class SquatProcessor extends BaseExerciseProcessor {
 
+    reset() {
+        super.reset();
+        this.minKneeAngle = 180;
+    }
+
     checkForm(landmarks: Landmark[]): { isGoodForm: boolean; feedback: string[]; badPoints: number[] } {
         const feedback: string[] = [];
         const badPoints: number[] = [];
@@ -34,6 +39,8 @@ export class SquatProcessor extends BaseExerciseProcessor {
         return { isGoodForm, feedback, badPoints };
     }
 
+    private minKneeAngle = 180; // Track deepest point
+
     countReps(landmarks: Landmark[], isGoodForm: boolean): void {
         const leftHip = landmarks[PoseLandmarkIndex.LEFT_HIP];
         const rightHip = landmarks[PoseLandmarkIndex.RIGHT_HIP];
@@ -53,19 +60,36 @@ export class SquatProcessor extends BaseExerciseProcessor {
         const avgKneeAngle = (leftKneeAngle + rightKneeAngle) / 2;
 
         // Check depth
-        // < 90 degrees is a good deep squat
-        // < 100 degrees is acceptable parallel squat
-        const isDeep = avgKneeAngle < 100;
+        // Relaxed threshold: < 110 degrees is acceptable
+        const isDeep = avgKneeAngle < 110;
 
         // Check standing
         // > 160 degrees is standing straight
         const isStanding = avgKneeAngle > 160;
 
         if (this.state.phase === 'start' || this.state.phase === 'up') {
+            // Track minimum angle during non-rep phases to detect "almost" reps
+            if (avgKneeAngle < this.minKneeAngle) {
+                this.minKneeAngle = avgKneeAngle;
+            }
+
             if (isDeep) {
                 this.state.phase = 'down';
                 this.state.isGoodRep = isGoodForm; // Start tracking rep quality
+                this.minKneeAngle = 180; // Reset tracker
+            } else if (isStanding && this.minKneeAngle < 140) {
+                // If we went down significantly (e.g. < 140) but not enough to trigger rep (< 110)
+                // and are now back up, give feedback.
+                // Only trigger if we haven't already triggered a rep (phase is start/up)
+
+                // Debounce/Check if we just finished a rep? 
+                // Actually, minKneeAngle should be reset on successful rep start.
+                // So if we are here, it means we went down and up WITHOUT triggering 'down'.
+
+                this.state.feedback.push(`Go lower! Reached ${Math.round(this.minKneeAngle)}°`);
+                this.minKneeAngle = 180; // Reset after feedback
             }
+
         } else if (this.state.phase === 'down') {
             // Update quality during the rep
             if (!isGoodForm) {
@@ -78,6 +102,7 @@ export class SquatProcessor extends BaseExerciseProcessor {
                 if (this.state.isGoodRep) {
                     this.state.reps += 1;
                 }
+                this.minKneeAngle = 180; // Reset for next rep
             }
         }
     }
