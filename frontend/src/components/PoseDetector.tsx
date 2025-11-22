@@ -41,7 +41,6 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'squats', targ
             const stopAndAnalyze = async () => {
                 setIsExerciseActive(false);
                 setIsAnalyzing(true);
-                if (onAnalysisStart) onAnalysisStart();
 
                 // Prepare session data
                 const sessionData = {
@@ -58,6 +57,26 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'squats', targ
                 };
 
                 try {
+                    // 1. Quick Evaluation
+                    const evalResponse = await fetch('/api/v1/evaluate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_data: sessionData }),
+                    });
+
+                    if (!evalResponse.ok) throw new Error('Evaluation failed');
+                    const evalData = await evalResponse.json();
+
+                    if (!evalData.needs_feedback) {
+                        // Good job! No full analysis needed.
+                        setIsAnalyzing(false);
+                        // Silent success - user can just start next set
+                        return;
+                    }
+
+                    // 2. Full Analysis (Only if needed)
+                    if (onAnalysisStart) onAnalysisStart(); // Switch tabs now
+
                     const response = await fetch('/api/v1/route', {
                         method: 'POST',
                         headers: {

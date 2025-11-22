@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from 'lucide-react';
+import { toast } from "sonner";
 import PoseDetector from './PoseDetector';
 import AnalysisView from './AnalysisView';
 
@@ -30,6 +31,12 @@ const ExerciseDetail: React.FC = () => {
     const handleAnalysisComplete = (feedback: string) => {
         setAnalysisFeedback(feedback);
         setIsAnalyzing(false);
+        if (activeTab === 'train') {
+            toast.success(feedback, {
+                duration: 5000,
+                className: "bg-green-500 text-white border-none"
+            });
+        }
     };
 
     return (

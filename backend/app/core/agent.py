@@ -11,6 +11,11 @@ chat = ChatOpenAI(
     model="gpt-4o", api_key=os.environ.get("OPENAI_API_KEY"), temperature=0.7
 )
 
+# Initialize Fast Model for Quick Evaluation
+chat_fast = ChatOpenAI(
+    model="gpt-4o-mini", api_key=os.environ.get("OPENAI_API_KEY"), temperature=0.3
+)
+
 
 async def analyze_pose(request: AgentParams) -> AgentResponse:
     instruction = (
@@ -82,3 +87,42 @@ async def analyze_pose(request: AgentParams) -> AgentResponse:
     response = await chat.ainvoke(messages)
 
     return AgentResponse(text=response.content)
+
+
+from app.core.schemas import EvaluationResponse
+from langchain_core.output_parsers import JsonOutputParser
+
+async def quick_evaluate(request: AgentParams) -> EvaluationResponse:
+    parser = JsonOutputParser(pydantic_object=EvaluationResponse)
+    
+    instruction = (
+        "You are a strict fitness coach. Analyze the session data to decide if the user needs detailed feedback. "
+        "Return JSON with a single key 'needs_feedback' (boolean). "
+        "Set 'needs_feedback' to true ONLY if there are significant form issues. "
+        "If form is generally good, set 'needs_feedback' to false."
+        "\n\n"
+    )
+
+    if request.session_data:
+        session = request.session_data
+        instruction += f"Exercise: {session.exercise_name}\n"
+        for i, rep in enumerate(session.reps):
+            instruction += (
+                f"Rep {i+1}: Valid={rep.is_valid}, "
+                f"Feedback={rep.feedback}, "
+                f"Metrics={rep.metrics}\n"
+            )
+
+    messages = [
+        SystemMessage(content="You are a fitness AI. Output valid JSON only."),
+        HumanMessage(content=instruction + "\n" + parser.get_format_instructions())
+    ]
+
+    try:
+        response = await chat_fast.ainvoke(messages)
+        parsed = parser.parse(response.content)
+        return EvaluationResponse(**parsed)
+    except Exception as e:
+        print(f"Quick evaluation failed: {e}")
+        # Fallback: always provide feedback if quick eval fails
+        return EvaluationResponse(needs_feedback=True)

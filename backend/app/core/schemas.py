@@ -18,6 +18,10 @@ class AgentResponse(BaseModel):
     text: str
 
 
+class EvaluationResponse(BaseModel):
+    needs_feedback: bool
+
+
 class RepDetail(BaseModel):
     duration: float
     feedback: List[str]
