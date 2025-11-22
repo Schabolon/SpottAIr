@@ -1,9 +1,14 @@
 import os
-from openai import AsyncOpenAI
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, SystemMessage
 from app.core.schemas import AgentParams, AgentResponse
 
-client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-
+# Initialize LangChain Chat Model
+chat = ChatOpenAI(
+    model="gpt-4o",
+    api_key=os.environ.get("OPENAI_API_KEY"),
+    temperature=0.7
+)
 
 async def analyze_pose(request: AgentParams) -> AgentResponse:
     instruction = (
@@ -12,10 +17,7 @@ async def analyze_pose(request: AgentParams) -> AgentResponse:
     )
 
     messages = [
-        {
-            "role": "system",
-            "content": "You are an expert fitness coach and biomechanics specialist. Analyze the provided image containing a 3D pose.",
-        },
+        SystemMessage(content="You are an expert fitness coach and biomechanics specialist. Analyze the provided image containing a 3D pose."),
     ]
 
     user_content = []
@@ -28,11 +30,9 @@ async def analyze_pose(request: AgentParams) -> AgentResponse:
         )
 
     user_content.append({"type": "text", "text": instruction})
-    messages.append({"role": "user", "content": user_content})
+    
+    messages.append(HumanMessage(content=user_content))
 
-    response = await client.chat.completions.create(
-        model="gpt-4o",
-        messages=messages,
-    )
+    response = await chat.ainvoke(messages)
 
-    return AgentResponse(text=response.choices[0].message.content)
+    return AgentResponse(text=response.content)
