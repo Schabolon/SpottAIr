@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
 import { Pose, POSE_CONNECTIONS, type Results } from '@mediapipe/pose';
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
-import { Camera } from '@mediapipe/camera_utils';
 
 interface PoseDetectorProps {
     exerciseId?: string;
@@ -208,25 +207,36 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'unknown' }) =
 
         pose.onResults(onResults);
 
-        let camera: Camera | null = null;
+        let animationFrameId: number;
 
-        if (webcamRef.current && webcamRef.current.video) {
-            camera = new Camera(webcamRef.current.video, {
-                onFrame: async () => {
-                    if (webcamRef.current && webcamRef.current.video) {
-                        await pose.send({ image: webcamRef.current.video });
-                    }
-                },
-                width: 640,
-                height: 480,
-            });
-            camera.start();
-        }
+        const detectPose = async () => {
+            if (
+                webcamRef.current &&
+                webcamRef.current.video &&
+                webcamRef.current.video.readyState === 4
+            ) {
+                await pose.send({ image: webcamRef.current.video });
+            }
+            animationFrameId = requestAnimationFrame(detectPose);
+        };
+
+        detectPose();
 
         return () => {
-            if (camera) {
-                // camera.stop(); // Camera utils doesn't have a simple stop method that cleans up perfectly always, but good practice if available
+            console.log("Cleaning up PoseDetector...");
+            cancelAnimationFrame(animationFrameId);
+
+            // 1. Manually stop tracks from the webcam ref
+            if (webcamRef.current && webcamRef.current.video && webcamRef.current.video.srcObject) {
+                const stream = webcamRef.current.video.srcObject as MediaStream;
+                const tracks = stream.getTracks();
+                tracks.forEach(track => {
+                    console.log("Stopping track:", track.label);
+                    track.stop();
+                });
             }
+
+            // 3. Close pose solution
             pose.close();
         };
     }, []);
