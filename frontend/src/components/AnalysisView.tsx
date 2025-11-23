@@ -310,20 +310,20 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ recordedData = [], analysis
                 {/* AI Feedback Panel */}
                 <div className="flex-1 min-h-0">
                     <div className="h-full backdrop-blur-sm rounded-3xl border shadow-sm p-6 flex flex-col bg-purple-500/10 border-purple-500/20">
-                        <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-purple-500 fill-purple-500/20" />
-                            <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                        <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 text-purple-500 fill-purple-500/20" />
+                            <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                                 AI Coach Feedback
                             </span>
                         </h2>
-                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
                             {isAnalyzing ? (
                                 <div className="h-full flex flex-col items-center justify-center gap-4">
                                     <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
                                     <p className="text-sm text-muted-foreground animate-pulse">Analyzing your form...</p>
                                 </div>
                             ) : analysisFeedback ? (
-                                <div className="prose dark:prose-invert max-w-none text-sm">
+                                <div className="prose dark:prose-invert max-w-none text-base leading-relaxed prose-p:text-gray-200 prose-headings:text-white prose-strong:text-purple-400 prose-li:text-gray-200">
                                     <ReactMarkdown>{analysisFeedback}</ReactMarkdown>
                                 </div>
                             ) : (
