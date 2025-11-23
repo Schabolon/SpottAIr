@@ -16,7 +16,7 @@ interface PoseDetectorProps {
     totalSets?: number;
     onNextSet?: () => void;
     onRecordingComplete?: (data: any[]) => void;
-    onAnalysisComplete?: (feedback: string) => void;
+    onAnalysisComplete?: (feedback: string, recommendation?: any) => void;
     onAnalysisStart?: () => void;
     autoStart?: boolean;
 }
@@ -121,8 +121,9 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({
             }
 
             const data = await response.json();
+            console.log("Analysis response data:", data);
             if (onAnalysisComplete) {
-                onAnalysisComplete(data.text);
+                onAnalysisComplete(data.text, data.recommendation);
             }
         } catch (error) {
             console.error("Analysis failed:", error);

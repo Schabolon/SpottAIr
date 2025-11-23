@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict, Any
 
 
 class Landmark(BaseModel):
@@ -14,8 +14,15 @@ class PoseLandmarkerResult(BaseModel):
     landmarks: List[Landmark]
 
 
+class RecommendationResponse(BaseModel):
+    exercise: str
+    reason: str
+    difficulty: str
+
+
 class AgentResponse(BaseModel):
     text: str
+    recommendation: RecommendationResponse | None = None
 
 
 class EvaluationResponse(BaseModel):
@@ -35,6 +42,33 @@ class ExerciseSession(BaseModel):
     exercise_name: str
     total_reps: int
     reps: List[RepDetail]
+
+
+class Exercise(BaseModel):
+    id: str
+    title: str
+    sets: str
+    reps: str | int
+    muscle: str
+    icon: Any | None = None
+    image: str | None = None
+
+
+class WorkoutSession(BaseModel):
+    title: str
+    focus: str
+    exercises: List[Exercise]
+
+
+class PlanAdjustmentRequest(BaseModel):
+    current_plan: Dict[str, WorkoutSession]
+    workout_feedback: str
+    exercise_name: str
+
+
+class PlanAdjustmentResponse(BaseModel):
+    adjusted_plan: Dict[str, WorkoutSession]
+    explanation: str
 
 
 class AgentParams(BaseModel):

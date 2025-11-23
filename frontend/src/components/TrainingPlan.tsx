@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { trainingSplit as initialTrainingSplit } from '../data/training-plan';
+import { useTrainingPlan } from '../context/TrainingPlanContext';
 
 // Helper for Notion-like colors
 const getMuscleColor = (muscle: string) => {
@@ -48,9 +49,48 @@ const getMuscleColor = (muscle: string) => {
     return colors[muscle] || 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400';
 };
 
+const ICON_MAP: Record<string, any> = {
+    'Dumbbell': Dumbbell,
+    'Footprints': Footprints,
+    'ArrowUp': ArrowUp,
+    'ArrowDown': ArrowDown,
+    'Activity': Activity,
+    'Shield': Shield,
+    'MoveVertical': MoveVertical,
+    'Grab': Grab,
+    'ArrowUpFromLine': ArrowUpFromLine,
+    'ArrowDownToLine': ArrowDownToLine,
+    'Sparkles': Sparkles,
+    'Layers': Layers,
+    'Hash': Hash,
+    'Repeat': Repeat,
+    'Circle': Circle,
+    'ChevronRight': ChevronRight,
+    'PlayCircle': PlayCircle,
+    'Plus': Plus
+};
+
+const ExerciseIcon = ({ icon, className }: { icon: any, className?: string }) => {
+    if (!icon) return <Dumbbell className={className} />;
+
+    // If it's a component (function)
+    if (typeof icon === 'function' || typeof icon === 'object') {
+        const IconComponent = icon;
+        return <IconComponent className={className} />;
+    }
+
+    // If it's a string name
+    if (typeof icon === 'string') {
+        const IconComponent = ICON_MAP[icon] || Dumbbell;
+        return <IconComponent className={className} />;
+    }
+
+    return <Dumbbell className={className} />;
+};
+
 const TrainingPlan: React.FC = () => {
     const navigate = useNavigate();
-    const [trainingSplit, setTrainingSplit] = useState(initialTrainingSplit);
+    const { trainingSplit, createWorkout, addExerciseToWorkout, lastAdjustmentExplanation } = useTrainingPlan();
     const [isNewWorkoutOpen, setIsNewWorkoutOpen] = useState(false);
     const [isAddExerciseOpen, setIsAddExerciseOpen] = useState(false);
     const [currentWorkoutKey, setCurrentWorkoutKey] = useState<string | null>(null);
@@ -66,15 +106,7 @@ const TrainingPlan: React.FC = () => {
 
     const handleCreateWorkout = () => {
         if (!newWorkoutName.trim()) return;
-        const key = newWorkoutName.toLowerCase().replace(/\s+/g, '-');
-        setTrainingSplit(prev => ({
-            ...prev,
-            [key]: {
-                title: newWorkoutName,
-                focus: "Custom Workout",
-                exercises: []
-            }
-        }));
+        createWorkout(newWorkoutName);
         setNewWorkoutName('');
         setIsNewWorkoutOpen(false);
     };
@@ -82,26 +114,11 @@ const TrainingPlan: React.FC = () => {
     const handleAddExercise = () => {
         if (!currentWorkoutKey || !newExercise.title) return;
 
-        setTrainingSplit(prev => {
-            const workout = prev[currentWorkoutKey as keyof typeof prev];
-            return {
-                ...prev,
-                [currentWorkoutKey]: {
-                    ...workout,
-                    exercises: [
-                        ...workout.exercises,
-                        {
-                            id: Date.now().toString(),
-                            title: newExercise.title,
-                            sets: newExercise.sets,
-                            reps: newExercise.reps,
-                            muscle: newExercise.muscle,
-                            icon: Dumbbell, // Default icon
-                            image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80' // Default image
-                        }
-                    ]
-                }
-            };
+        addExerciseToWorkout(currentWorkoutKey, {
+            title: newExercise.title,
+            sets: newExercise.sets,
+            reps: newExercise.reps,
+            muscle: newExercise.muscle
         });
 
         setNewExercise({ title: '', muscle: '', sets: '', reps: '' });
@@ -275,7 +292,7 @@ const TrainingPlan: React.FC = () => {
                                                 <TableCell className="font-medium py-4">
                                                     <div className="flex items-center gap-4">
                                                         <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-muted shrink-0 text-muted-foreground">
-                                                            <exercise.icon className="w-5 h-5" />
+                                                            <ExerciseIcon icon={exercise.icon} className="w-5 h-5" />
                                                         </div>
                                                         <span className="text-base">{exercise.title}</span>
                                                     </div>
@@ -321,9 +338,11 @@ const TrainingPlan: React.FC = () => {
                                             <Sparkles className="w-8 h-8 text-purple-500" />
                                         </div>
                                         <div>
-                                            <p className="font-medium text-purple-900 dark:text-purple-100">Plan Optimized</p>
+                                            <p className="font-medium text-purple-900 dark:text-purple-100">
+                                                {lastAdjustmentExplanation ? "Latest Adjustment" : "Plan Optimized"}
+                                            </p>
                                             <p className="text-sm text-muted-foreground mt-1">
-                                                Your training split has been adjusted based on your recent performance and recovery data.
+                                                {lastAdjustmentExplanation || "Your training split has been adjusted based on your recent performance and recovery data."}
                                             </p>
                                         </div>
                                     </div>

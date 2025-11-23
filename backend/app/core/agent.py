@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import JsonOutputParser
-from app.core.schemas import AgentParams, AgentResponse, EvaluationResponse
+from app.core.schemas import AgentParams, AgentResponse, EvaluationResponse, RecommendationResponse, PlanAdjustmentRequest, PlanAdjustmentResponse
 
 load_dotenv()
 
@@ -86,8 +86,51 @@ async def analyze_pose(request: AgentParams) -> AgentResponse:
     messages.append(HumanMessage(content=user_content))
 
     response = await chat.ainvoke(messages)
+    feedback_text = response.content
 
-    return AgentResponse(text=response.content)
+    # 2. Generate Recommendation (if needed)
+    # We assume if we are here, feedback was needed.
+    recommendation = await recommend_adjustment(request.session_data.exercise_name, feedback_text)
+
+    return AgentResponse(text=feedback_text, recommendation=recommendation)
+
+
+async def recommend_adjustment(exercise_name: str, feedback_text: str) -> RecommendationResponse | None:
+    parser = JsonOutputParser(pydantic_object=RecommendationResponse)
+
+    prompt = (
+        f"Based on the following analysis of a {exercise_name} session, "
+        "suggest ONE corrective exercise to add to the training plan to fix the main issue.\n\n"
+        f"Analysis:\n{feedback_text}\n\n"
+        "You MUST suggest a corrective exercise if there are any form issues mentioned.\n"
+        "Only return null if the feedback explicitly states that the form was perfect with no issues.\n"
+        "Return a JSON object with:\n"
+        "- 'exercise': Name of the corrective exercise\n"
+        "- 'reason': Brief explanation of why this helps\n"
+        "- 'difficulty': 'Beginner', 'Intermediate', or 'Advanced'\n"
+    )
+
+    messages = [
+        SystemMessage(content="You are an expert fitness coach. Output valid JSON only."),
+        HumanMessage(content=prompt + "\n" + parser.get_format_instructions()),
+    ]
+
+    try:
+        print(f"Generating recommendation for {exercise_name} with feedback: {feedback_text[:50]}...")
+        response = await chat.ainvoke(messages)
+        print(f"Recommendation response: {response.content}")
+        
+        # Handle potential null response or empty string if model decides no rec is needed
+        if not response.content.strip() or response.content.strip().lower() == 'null':
+            print("No recommendation generated (null response).")
+            return None
+        
+        parsed = parser.parse(response.content)
+        print(f"Parsed recommendation: {parsed}")
+        return RecommendationResponse(**parsed)
+    except Exception as e:
+        print(f"Recommendation failed: {e}")
+        return None
 
 
 async def quick_evaluate(request: AgentParams) -> EvaluationResponse:
@@ -123,4 +166,46 @@ async def quick_evaluate(request: AgentParams) -> EvaluationResponse:
     except Exception as e:
         print(f"Quick evaluation failed: {e}")
         # Fallback: always provide feedback if quick eval fails
+        # Fallback: always provide feedback if quick eval fails
         return EvaluationResponse(needs_feedback=True)
+
+
+async def adjust_training_plan(request: PlanAdjustmentRequest) -> PlanAdjustmentResponse:
+    parser = JsonOutputParser(pydantic_object=PlanAdjustmentResponse)
+
+    prompt = (
+        "You are an expert fitness coach. Your goal is to optimize the user's training plan based on their recent performance.\n\n"
+        f"Context:\n"
+        f"- User just performed: {request.exercise_name}\n"
+        f"- Feedback received: {request.workout_feedback}\n\n"
+        "Current Training Plan (JSON):\n"
+        f"{request.current_plan}\n\n"
+        "Task:\n"
+        "1. Analyze the feedback and the current plan.\n"
+        "2. Make necessary adjustments to the plan. This could involve:\n"
+        "   - Adding corrective exercises (e.g., for posture or weak points).\n"
+        "   - Adjusting sets/reps for existing exercises.\n"
+        "   - Swapping exercises if one is causing issues.\n"
+        "3. Return the FULLY adjusted training plan structure.\n"
+        "4. Provide a short, encouraging explanation of what you changed and why.\n"
+        "5. For 'icon', use one of: 'Dumbbell', 'Activity', 'Footprints', 'ArrowUp', 'Shield', 'MoveVertical'. Default to 'Dumbbell'.\n\n"
+        "IMPORTANT: Return valid JSON matching the PlanAdjustmentResponse schema.\n"
+    )
+
+    messages = [
+        SystemMessage(content="You are a world-class personal trainer AI. Output valid JSON only."),
+        HumanMessage(content=prompt + "\n" + parser.get_format_instructions()),
+    ]
+
+    try:
+        print("Generating plan adjustment...")
+        response = await chat.ainvoke(messages)
+        parsed = parser.parse(response.content)
+        return PlanAdjustmentResponse(**parsed)
+    except Exception as e:
+        print(f"Plan adjustment failed: {e}")
+        # Fallback: return original plan with error message
+        return PlanAdjustmentResponse(
+            adjusted_plan=request.current_plan,
+            explanation="Sorry, I couldn't optimize the plan at this moment. Please try again later."
+        )
