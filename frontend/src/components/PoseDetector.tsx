@@ -41,7 +41,7 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({
     const { playAudioFromCategory, isPlaying: isAudioPlaying, isOnCooldown: isAudioOnCooldown, cleanup: cleanupAudio } = useAudioPlayer(3000);
     // Evaluation State
     const [evalStatus, setEvalStatus] = useState<'idle' | 'evaluating' | 'success' | 'feedback_needed'>('idle');
-    const [breakTimer, setBreakTimer] = useState(20);
+    const [breakTimer, setBreakTimer] = useState(2);
 
     // Exercise State
     const [poseState, setPoseState] = useState<ExerciseState>({
@@ -104,7 +104,7 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({
                 setEvalStatus('success');
                 setIsAnalyzing(false);
                 // Start break timer
-                setBreakTimer(20);
+                setBreakTimer(2);
                 return;
             }
 
