@@ -560,14 +560,6 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({
                 </div>
 
                 {/* Status Badge - Minimal */}
-                <div className="absolute top-6 left-6 z-10">
-                    {isExerciseActive && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/20 backdrop-blur-md border border-white/10">
-                            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                            <span className="text-xs font-medium text-white/80 uppercase tracking-wider">REC</span>
-                        </div>
-                    )}
-                </div>
 
 
             </div>
