@@ -7,16 +7,27 @@ import { toast } from "sonner";
 import PoseDetector from './PoseDetector';
 import AnalysisView from './AnalysisView';
 
+import { trainingSplit } from '../data/training-plan';
+
 const ExerciseDetail: React.FC = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const exerciseTitle = id ? id.charAt(0).toUpperCase() + id.slice(1) : 'Exercise';
+
+    // Find exercise to get target reps
+    const exercise = Object.values(trainingSplit)
+        .flatMap(day => day.exercises)
+        .find(ex => ex.id === id);
+
+    const targetReps = exercise?.reps || 10; // Default to 10 if not found
+    const totalSets = exercise?.sets ? parseInt(exercise.sets) : 3;
 
     // State to store recorded pose data
     const [recordedData, setRecordedData] = React.useState<any[]>([]);
     const [analysisFeedback, setAnalysisFeedback] = React.useState<string | null>(null);
     const [activeTab, setActiveTab] = React.useState("train");
     const [isAnalyzing, setIsAnalyzing] = React.useState(false);
+    const [currentSet, setCurrentSet] = React.useState(1);
 
     const handleRecordingComplete = (data: any[]) => {
         console.log("Recording complete, frames:", data.length);
@@ -26,6 +37,16 @@ const ExerciseDetail: React.FC = () => {
     const handleAnalysisStart = () => {
         setIsAnalyzing(true);
         setActiveTab("analyze");
+    };
+
+    const handleNextSet = () => {
+        if (currentSet < totalSets) {
+            setCurrentSet(prev => prev + 1);
+            // Reset logic will be handled inside PoseDetector when set changes or via a key
+        } else {
+            toast.success("Exercise Completed! 🎉");
+            // Optional: Navigate to next exercise
+        }
     };
 
     const handleAnalysisComplete = (feedback: string) => {
@@ -47,7 +68,10 @@ const ExerciseDetail: React.FC = () => {
                         <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="rounded-full">
                             <ArrowLeft className="h-6 w-6" />
                         </Button>
-                        <h1 className="text-2xl font-semibold tracking-tight">{exerciseTitle}</h1>
+                        <div className="flex flex-col">
+                            <h1 className="text-2xl font-semibold tracking-tight">{exerciseTitle}</h1>
+                            <span className="text-sm text-muted-foreground">Set {currentSet} of {totalSets}</span>
+                        </div>
                     </div>
 
                     <TabsList className="flex gap-6 bg-transparent p-0 h-auto">
@@ -69,11 +93,16 @@ const ExerciseDetail: React.FC = () => {
                 <TabsContent value="train" className="flex-1 min-h-0 mt-0 animate-in fade-in-50 slide-in-from-bottom-4 duration-500">
                     <div className="h-full overflow-hidden">
                         <PoseDetector
+                            key={currentSet} // Reset PoseDetector on new set
                             exerciseId={id || 'unknown'}
-                            targetReps={3}
+                            targetReps={typeof targetReps === 'number' ? targetReps : 10}
+                            currentSet={currentSet}
+                            totalSets={totalSets}
+                            onNextSet={handleNextSet}
                             onRecordingComplete={handleRecordingComplete}
                             onAnalysisComplete={handleAnalysisComplete}
                             onAnalysisStart={handleAnalysisStart}
+                            autoStart={currentSet > 1}
                         />
                     </div>
                 </TabsContent>

@@ -1,27 +1,47 @@
 import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, ArrowRight, Timer, Loader2 } from 'lucide-react';
 import { Pose, POSE_CONNECTIONS, type Results } from '@mediapipe/pose';
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { getProcessor } from '../lib/exercises/registry';
 import { ExerciseState } from '../lib/exercises/types';
 import { useSpottair } from '@/lib/spottair';
 import * as tf from '@tensorflow/tfjs';
+import useAudioPlayer from '@/lib/audio'; // Add this import
 
 interface PoseDetectorProps {
     exerciseId?: string;
     targetReps?: number;
+    currentSet?: number;
+    totalSets?: number;
+    onNextSet?: () => void;
     onRecordingComplete?: (data: any[]) => void;
     onAnalysisComplete?: (feedback: string) => void;
     onAnalysisStart?: () => void;
+    autoStart?: boolean;
 }
 
-const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'squats', targetReps = 10, onRecordingComplete, onAnalysisComplete, onAnalysisStart }) => {
+const PoseDetector: React.FC<PoseDetectorProps> = ({
+    exerciseId = 'squats',
+    targetReps = 1,
+    currentSet = 1,
+    totalSets = 3,
+    onNextSet,
+    onRecordingComplete,
+    onAnalysisComplete,
+    onAnalysisStart,
+    autoStart = false
+}) => {
     const webcamRef = useRef<Webcam>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isExerciseActive, setIsExerciseActive] = useState(false);
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [countdownValue, setCountdownValue] = useState(3);
+
+    const { playAudioFromCategory, isPlaying: isAudioPlaying, isOnCooldown: isAudioOnCooldown, cleanup: cleanupAudio } = useAudioPlayer(3000);
+    // Evaluation State
+    const [evalStatus, setEvalStatus] = useState<'idle' | 'evaluating' | 'success' | 'feedback_needed'>('idle');
+    const [breakTimer, setBreakTimer] = useState(20);
 
     // Exercise State
     const [poseState, setPoseState] = useState<ExerciseState>({
@@ -35,79 +55,131 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'squats', targ
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
 
+    const stopAndAnalyze = async () => {
+        setIsExerciseActive(false);
+        setIsCountingDown(false);
+        setCountdownValue(3);
+        setIsAnalyzing(true);
+        setEvalStatus('evaluating');
+
+        // Prepare session data
+        const sessionData = {
+            exercise_name: exerciseId,
+            total_reps: poseState.reps,
+            reps: poseState.history.map(h => ({
+                duration: h.duration,
+                feedback: h.feedback,
+                start_angles: h.startAngles,
+                min_angles: h.minAngles,
+                metrics: h.metrics,
+                is_valid: h.isValid
+            }))
+        };
+
+        try {
+            // 1. Quick Evaluation
+            const evalResponse = await fetch('/api/v1/evaluate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_data: sessionData }),
+            });
+
+            if (!evalResponse.ok) throw new Error('Evaluation failed');
+            const evalData = await evalResponse.json();
+
+            if (!evalData.needs_feedback) {
+                // Good job! No full analysis needed.
+                setEvalStatus('success');
+                setIsAnalyzing(false);
+                // Start break timer
+                setBreakTimer(20);
+                return;
+            }
+
+            // 2. Full Analysis (Only if needed)
+            setEvalStatus('feedback_needed');
+            if (onAnalysisStart) onAnalysisStart(); // Switch tabs now
+
+            const response = await fetch('/api/v1/route', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    instruction: "Analyze this squat session.",
+                    session_data: sessionData
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            if (onAnalysisComplete) {
+                onAnalysisComplete(data.text);
+            }
+            if (onRecordingComplete) {
+                onRecordingComplete(currentRecordingRef.current);
+            }
+        } catch (error) {
+            console.error("Analysis failed:", error);
+            setEvalStatus('idle'); // Reset on error
+        } finally {
+            if (evalStatus !== 'success') {
+                setIsAnalyzing(false);
+            }
+        }
+    };
+
     // Trigger Analysis when target reps reached
     useEffect(() => {
         if (poseState.reps >= targetReps && isExerciseActive && !isAnalyzing) {
-            const stopAndAnalyze = async () => {
-                setIsExerciseActive(false);
-                setIsAnalyzing(true);
-
-                // Prepare session data
-                const sessionData = {
-                    exercise_name: exerciseId,
-                    total_reps: poseState.reps,
-                    reps: poseState.history.map(h => ({
-                        duration: h.duration,
-                        feedback: h.feedback,
-                        start_angles: h.startAngles,
-                        min_angles: h.minAngles,
-                        metrics: h.metrics,
-                        is_valid: h.isValid
-                    }))
-                };
-
-                try {
-                    // 1. Quick Evaluation
-                    const evalResponse = await fetch('/api/v1/evaluate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ session_data: sessionData }),
-                    });
-
-                    if (!evalResponse.ok) throw new Error('Evaluation failed');
-                    const evalData = await evalResponse.json();
-
-                    if (!evalData.needs_feedback) {
-                        // Good job! No full analysis needed.
-                        setIsAnalyzing(false);
-                        // Silent success - user can just start next set
-                        return;
-                    }
-
-                    // 2. Full Analysis (Only if needed)
-                    if (onAnalysisStart) onAnalysisStart(); // Switch tabs now
-
-                    const response = await fetch('/api/v1/route', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            instruction: "Analyze this squat session.",
-                            session_data: sessionData
-                        }),
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`API Error: ${response.statusText}`);
-                    }
-
-                    const data = await response.json();
-                    if (onAnalysisComplete) {
-                        onAnalysisComplete(data.text);
-                    }
-                    if (onRecordingComplete) {
-                        onRecordingComplete(currentRecordingRef.current);
-                    }
-                } catch (error) {
-                    console.error("Analysis failed:", error);
-                } finally {
-                    setIsAnalyzing(false);
-                }
-            };
             stopAndAnalyze();
         }
-    }, [poseState.reps, targetReps, isExerciseActive, isAnalyzing, exerciseId, poseState.history, onAnalysisComplete, onRecordingComplete]);
+    }, [poseState.reps, targetReps, isExerciseActive, isAnalyzing]);
+
+    const startExercise = () => {
+        if (isExerciseActive) {
+            // Manual Stop
+            if (poseState.reps > 0) {
+                stopAndAnalyze();
+            } else {
+                // Just reset if no reps done
+                setIsExerciseActive(false);
+                setIsCountingDown(false);
+                setCountdownValue(3);
+                processorRef.current.reset();
+            }
+        } else {
+            // Start countdown
+            setIsCountingDown(true);
+            setCountdownValue(3);
+        }
+    };
+
+    // Auto-start effect
+    useEffect(() => {
+        if (autoStart) {
+            startExercise();
+        }
+    }, []); // Run once on mount
+
+    // Break Timer & Auto-Start
+    useEffect(() => {
+        let interval: ReturnType<typeof setInterval>;
+        if (evalStatus === 'success') {
+            if (breakTimer > 0) {
+                interval = setInterval(() => {
+                    setBreakTimer(prev => prev - 1);
+                }, 1000);
+            } else {
+                // Auto-start next set
+                if (onNextSet) onNextSet();
+            }
+        }
+        return () => clearInterval(interval);
+    }, [evalStatus, breakTimer, onNextSet]);
 
     const isExerciseActiveRef = useRef(isExerciseActive);
     const isCountingDownRef = useRef(isCountingDown);
@@ -173,38 +245,34 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'squats', targ
         return () => clearInterval(interval);
     }, [isCountingDown, countdownValue]);
 
-    const startExercise = () => {
-        if (isExerciseActive) {
-            setIsExerciseActive(false);
-            setIsCountingDown(false);
-            setCountdownValue(3);
-
-            // Stop recording and send data
-            if (onRecordingComplete && currentRecordingRef.current.length > 0) {
-                onRecordingComplete(currentRecordingRef.current);
-            }
-            processorRef.current.reset();
-            setPoseState({
-                reps: 0,
-                phase: 'start',
-                feedback: [],
-                isGoodRep: true,
-                badPoints: [],
-                lastRepDuration: 0,
-                history: []
-            });
-        } else {
-            setIsCountingDown(true);
-            setCountdownValue(3);
-            currentRecordingRef.current = []; // Reset on start
-        }
-    };
 
     const [currentFeedbackClass, setCurrentFeedbackClass] = useState<string>('correct');
     const [debugInfo, setDebugInfo] = useState<{ class: string, confidence: number } | null>(null);
     const lastClassChangeTimeRef = useRef<number>(0);
     const pendingClassRef = useRef<string | null>(null);
     const currentFeedbackClassRef = useRef<string>('correct'); // Ref to track current state without dependency issues
+
+    useEffect(() => {
+        // Only play audio when exercise is active
+        if (!isExerciseActive) return;
+
+        // Map AI model classes to audio categories
+        // Based on: const classes = ["correct", "feet_wide", "knees_caved", "spine_misalignment"]
+        const classToAudioCategory: Record<string, string> = {
+            'feet_wide': 'feet',           // feet_wide → play from feet audio folder
+            'knees_caved': 'knee',          // knees_caved → play from knee audio folder
+            'spine_misalignment': 'spine'   // spine_misalignment → play from spine audio folder
+        };
+
+        const audioCategory = classToAudioCategory[currentFeedbackClass];
+
+        // Play audio only when we detect an error class (not 'correct' or 'not_visible')
+        if (audioCategory && !isAudioPlaying && !isAudioOnCooldown) {
+            console.log(`🔊 AI detected: ${currentFeedbackClass} → Playing audio: ${audioCategory}`);
+            playAudioFromCategory(audioCategory);
+        }
+    }, [currentFeedbackClass, isExerciseActive, playAudioFromCategory, isAudioPlaying, isAudioOnCooldown]);
+
 
     const onResults = (results: Results) => {
         if (!canvasRef.current || !webcamRef.current || !webcamRef.current.video) return;
@@ -425,6 +493,7 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'squats', targ
     // Cleanup on unmount
     useEffect(() => {
         return () => {
+            cleanupAudio(); // ✅ Clean up audio player
             console.log("Cleaning up PoseDetector...");
             if (webcamRef.current && webcamRef.current.video && webcamRef.current.video.srcObject) {
                 const stream = webcamRef.current.video.srcObject as MediaStream;
@@ -496,13 +565,15 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'squats', targ
                         </div>
                     )}
                 </div>
+
+
             </div>
 
             {/* Sidebar Stats */}
-            <div className="w-full lg:w-[320px] flex flex-col gap-4">
+            <div className="w-full lg:w-[320px] flex flex-col gap-4 h-full overflow-y-auto custom-scrollbar pb-4">
                 {/* Rep Counter */}
                 {/* Rep Counter */}
-                <div className="relative overflow-hidden p-6 rounded-3xl shadow-sm border bg-card text-card-foreground">
+                <div className="relative overflow-hidden p-6 rounded-3xl shadow-sm border bg-card text-card-foreground shrink-0">
                     <h2 className="text-base font-semibold mb-2 flex items-center gap-2">Current Reps</h2>
                     <div className="flex items-baseline gap-2">
                         <span className="text-7xl font-bold tracking-tight">
@@ -519,78 +590,149 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({ exerciseId = 'squats', targ
                         />
                     </div>
                     {poseState.reps > 0 && (
-                        <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-                            <span className="font-medium text-foreground">Last Rep:</span> {poseState.lastRepDuration?.toFixed(1) || '0.0'}s
+                        <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+                            <div>
+                                <span className="font-medium text-foreground">Last Rep:</span> {poseState.lastRepDuration?.toFixed(1) || '0.0'}s
+                            </div>
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50">
+                                <span className="font-medium text-foreground">Set</span>
+                                <span>{currentSet}/{totalSets}</span>
+                            </div>
                         </div>
                     )}
                 </div>
 
                 {/* Feedback Panel */}
-                <div className={`flex-1 backdrop-blur-sm rounded-3xl border shadow-sm p-6 flex flex-col transition-colors duration-300 ${currentFeedbackClass === 'not_visible' ? 'bg-yellow-500/10 border-yellow-500/50' : currentFeedbackClass !== 'correct' ? 'bg-red-500/10 border-red-500/50' : 'bg-card/50 border-border'}`}>
-                    <h2 className="text-base font-semibold mb-4 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-purple-500 fill-purple-500/20" />
-                            <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                                Real-time AI Analysis
-                            </span>
-                        </div>
-                        {debugInfo && (
-                            <div className="text-[10px] font-mono text-muted-foreground opacity-50">
-                                {debugInfo.class}: {(debugInfo.confidence * 100).toFixed(0)}%
-                            </div>
-                        )}
-                    </h2>
+                <FeedbackPanel
+                    currentFeedbackClass={currentFeedbackClass}
+                    ruleFeedback={poseState.feedback}
+                    isExerciseActive={isExerciseActive}
+                    debugInfo={debugInfo}
+                />
 
-                    <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar flex flex-col items-center justify-center">
-                        {currentFeedbackClass === 'correct' ? (
-                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50 gap-4">
-                                {isExerciseActive ? (
-                                    <>
-                                        <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center animate-pulse">
-                                            <span className="text-3xl">✨</span>
-                                        </div>
-                                        <p className="text-center font-medium text-green-500">Perfect Form!</p>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="w-16 h-16 rounded-full bg-purple-500/10 flex items-center justify-center">
-                                            <Sparkles className="w-8 h-8 text-purple-500" />
-                                        </div>
-                                        <p className="text-center">Start exercise to<br />receive feedback</p>
-                                    </>
-                                )}
-                            </div>
-                        ) : currentFeedbackClass === 'not_visible' ? (
-                            <div className="flex flex-col items-center gap-4 animate-in zoom-in duration-300">
-                                <div className="w-20 h-20 rounded-full bg-yellow-500/20 flex items-center justify-center border-2 border-yellow-500 animate-pulse">
-                                    <span className="text-4xl">📷</span>
-                                </div>
-                                <div className="text-center">
-                                    <h3 className="text-xl font-bold text-yellow-500 mb-1">Visibility Issue</h3>
-                                    <p className="text-yellow-400 font-medium">
-                                        Ensure full body is visible
-                                    </p>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center gap-4 animate-in zoom-in duration-300">
-                                <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center border-2 border-red-500 animate-bounce">
-                                    <span className="text-4xl">
-                                        {currentFeedbackClass === 'feet_wide' && '↔️'}
-                                        {currentFeedbackClass === 'knees_caved' && '🦵'}
-                                        {currentFeedbackClass === 'spine_misalignment' && '🦴'}
-                                    </span>
-                                </div>
-                                <div className="text-center">
-                                    <h3 className="text-xl font-bold text-red-500 mb-1">Correction Needed</h3>
-                                    <p className="text-red-400 font-medium">
-                                        {currentFeedbackClass === 'feet_wide' && 'Feet too wide'}
-                                        {currentFeedbackClass === 'knees_caved' && 'Knees caving in'}
-                                        {currentFeedbackClass === 'spine_misalignment' && 'Spine misaligned'}
-                                    </p>
-                                </div>
-                            </div>
+                {/* Next Set / Evaluation Action Button */}
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 mt-auto">
+                    <button
+                        onClick={() => {
+                            if (evalStatus === 'success' && onNextSet) {
+                                onNextSet();
+                            }
+                        }}
+                        disabled={evalStatus !== 'success'}
+                        className={`relative w-full flex items-center justify-between px-6 py-4 rounded-2xl shadow-lg transition-all transform border overflow-hidden ${evalStatus === 'success'
+                            ? 'bg-green-500/20 text-green-100 border-green-400/30 shadow-green-500/10 cursor-pointer hover:scale-[1.02] active:scale-[0.98]'
+                            : 'bg-muted text-muted-foreground border-border cursor-not-allowed opacity-50'
+                            }`}
+                    >
+                        {/* Progress Bar Background */}
+                        {evalStatus === 'success' && (
+                            <div
+                                className="absolute inset-0 bg-green-500 transition-all duration-1000 ease-linear"
+                                style={{ width: `${((20 - breakTimer) / 20) * 100}%` }}
+                            />
                         )}
+
+                        {/* Content (Relative to sit on top of progress bar) */}
+                        <div className="relative z-10 flex items-center justify-between w-full">
+                            {evalStatus === 'evaluating' ? (
+                                <div className="flex items-center justify-center w-full gap-3">
+                                    <Loader2 className="w-6 h-6 animate-spin" />
+                                    <span className="font-semibold">Analyzing Form...</span>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex flex-col items-start text-left">
+                                        <span className="text-xs font-medium opacity-90 uppercase tracking-wider">
+                                            {evalStatus === 'success' ? 'Up Next' : 'Current'}
+                                        </span>
+                                        {evalStatus === 'success' ? (
+                                            <div className="flex items-center gap-1.5 font-mono text-sm opacity-100 font-bold drop-shadow-sm">
+                                                <Timer className="w-3 h-3" />
+                                                <span>00:{breakTimer.toString().padStart(2, '0')}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="font-semibold text-sm">
+                                                {isExerciseActive ? `Finish Set ${currentSet}` : 'Waiting to Start...'}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${evalStatus === 'success' ? 'bg-white/20 backdrop-blur-sm' : 'bg-black/5'
+                                        }`}>
+                                        <ArrowRight className="w-6 h-6" />
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+import { FeedbackService } from '../lib/services/feedback';
+
+const FeedbackPanel = ({ currentFeedbackClass, ruleFeedback, isExerciseActive, debugInfo }: any) => {
+    // Determine visibility based on class (simplified for now, as logic is inside Service too)
+    const isVisible = currentFeedbackClass !== 'not_visible';
+
+    const feedback = FeedbackService.getFeedback(
+        currentFeedbackClass,
+        ruleFeedback,
+        isVisible,
+        isExerciseActive
+    );
+
+    // Styles based on type
+    const styles = {
+        success: 'bg-card/50 border-border',
+        warning: 'bg-yellow-500/10 border-yellow-500/50',
+        error: 'bg-red-500/10 border-red-500/50',
+        info: 'bg-card/50 border-border'
+    };
+
+    const textColors = {
+        success: 'text-green-500',
+        warning: 'text-yellow-500',
+        error: 'text-red-500',
+        info: 'text-foreground'
+    };
+
+    const bgColors = {
+        success: 'bg-green-500/10',
+        warning: 'bg-yellow-500/20',
+        error: 'bg-red-500/20',
+        info: 'bg-purple-500/10'
+    };
+
+    return (
+        <div className={`flex-1 backdrop-blur-sm rounded-3xl border shadow-sm p-6 flex flex-col transition-colors duration-300 ${styles[feedback.type]}`}>
+            <h2 className="text-base font-semibold mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-500 fill-purple-500/20" />
+                    <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                        Real-time AI Analysis
+                    </span>
+                </div>
+                {debugInfo && (
+                    <div className="text-[10px] font-mono text-muted-foreground opacity-50">
+                        {debugInfo.class}: {(debugInfo.confidence * 100).toFixed(0)}%
+                    </div>
+                )}
+            </h2>
+
+            <div className="flex flex-col items-center justify-center py-4">
+                <div className="flex flex-col items-center gap-4 animate-in zoom-in duration-300">
+                    <div className={`w-20 h-20 rounded-full flex items-center justify-center border-2 ${(feedback.type === 'warning' || feedback.type === 'error') ? 'animate-bounce border-current' : 'animate-pulse border-transparent'} ${bgColors[feedback.type]} ${textColors[feedback.type]}`}>
+                        <span className="text-4xl">
+                            {feedback.type === 'info' ? <Sparkles className="w-8 h-8 text-purple-500" /> : feedback.icon}
+                        </span>
+                    </div>
+                    <div className="text-center">
+                        {feedback.title && <h3 className={`text-xl font-bold mb-1 ${textColors[feedback.type]}`}>{feedback.title}</h3>}
+                        <p className={`font-medium ${feedback.type === 'success' ? 'text-green-500' : 'text-muted-foreground'}`}>
+                            {feedback.message}
+                        </p>
                     </div>
                 </div>
             </div>
