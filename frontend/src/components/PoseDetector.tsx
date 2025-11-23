@@ -62,6 +62,11 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({
         setIsAnalyzing(true);
         setEvalStatus('evaluating');
 
+        // Save recording immediately
+        if (onRecordingComplete) {
+            onRecordingComplete(currentRecordingRef.current);
+        }
+
         // Prepare session data
         const sessionData = {
             exercise_name: exerciseId,
@@ -119,9 +124,6 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({
             if (onAnalysisComplete) {
                 onAnalysisComplete(data.text);
             }
-            if (onRecordingComplete) {
-                onRecordingComplete(currentRecordingRef.current);
-            }
         } catch (error) {
             console.error("Analysis failed:", error);
             setEvalStatus('idle'); // Reset on error
@@ -142,10 +144,11 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({
     const startExercise = () => {
         if (isExerciseActive) {
             // Manual Stop
-            if (poseState.reps > 0) {
+            // Allow stopping if we have ANY recorded data, even if reps are 0
+            if (currentRecordingRef.current.length > 0) {
                 stopAndAnalyze();
             } else {
-                // Just reset if no reps done
+                // Just reset if no data
                 setIsExerciseActive(false);
                 setIsCountingDown(false);
                 setCountdownValue(3);
