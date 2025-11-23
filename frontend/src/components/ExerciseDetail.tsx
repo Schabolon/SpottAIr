@@ -102,6 +102,7 @@ const ExerciseDetail: React.FC = () => {
                             onRecordingComplete={handleRecordingComplete}
                             onAnalysisComplete={handleAnalysisComplete}
                             onAnalysisStart={handleAnalysisStart}
+                            autoStart={currentSet > 1}
                         />
                     </div>
                 </TabsContent>

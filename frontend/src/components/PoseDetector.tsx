@@ -18,6 +18,7 @@ interface PoseDetectorProps {
     onRecordingComplete?: (data: any[]) => void;
     onAnalysisComplete?: (feedback: string) => void;
     onAnalysisStart?: () => void;
+    autoStart?: boolean;
 }
 
 const PoseDetector: React.FC<PoseDetectorProps> = ({
@@ -28,7 +29,8 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({
     onNextSet,
     onRecordingComplete,
     onAnalysisComplete,
-    onAnalysisStart
+    onAnalysisStart,
+    autoStart = false
 }) => {
     const webcamRef = useRef<Webcam>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -36,7 +38,7 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [countdownValue, setCountdownValue] = useState(3);
 
-  const { playAudioFromCategory, isPlaying: isAudioPlaying, isOnCooldown: isAudioOnCooldown, cleanup: cleanupAudio } = useAudioPlayer(3000);
+    const { playAudioFromCategory, isPlaying: isAudioPlaying, isOnCooldown: isAudioOnCooldown, cleanup: cleanupAudio } = useAudioPlayer(3000);
     // Evaluation State
     const [evalStatus, setEvalStatus] = useState<'idle' | 'evaluating' | 'success' | 'feedback_needed'>('idle');
     const [breakTimer, setBreakTimer] = useState(20);
@@ -156,6 +158,13 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({
         }
     };
 
+    // Auto-start effect
+    useEffect(() => {
+        if (autoStart) {
+            startExercise();
+        }
+    }, []); // Run once on mount
+
     // Break Timer & Auto-Start
     useEffect(() => {
         let interval: ReturnType<typeof setInterval>;
@@ -243,29 +252,29 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({
     const pendingClassRef = useRef<string | null>(null);
     const currentFeedbackClassRef = useRef<string>('correct'); // Ref to track current state without dependency issues
 
-  useEffect(() => {
-    // Only play audio when exercise is active
-    if (!isExerciseActive) return;
+    useEffect(() => {
+        // Only play audio when exercise is active
+        if (!isExerciseActive) return;
 
-    // Map AI model classes to audio categories
-    // Based on: const classes = ["correct", "feet_wide", "knees_caved", "spine_misalignment"]
-    const classToAudioCategory: Record<string, string> = {
-      'feet_wide': 'feet',           // feet_wide → play from feet audio folder
-      'knees_caved': 'knee',          // knees_caved → play from knee audio folder
-      'spine_misalignment': 'spine'   // spine_misalignment → play from spine audio folder
-    };
+        // Map AI model classes to audio categories
+        // Based on: const classes = ["correct", "feet_wide", "knees_caved", "spine_misalignment"]
+        const classToAudioCategory: Record<string, string> = {
+            'feet_wide': 'feet',           // feet_wide → play from feet audio folder
+            'knees_caved': 'knee',          // knees_caved → play from knee audio folder
+            'spine_misalignment': 'spine'   // spine_misalignment → play from spine audio folder
+        };
 
-    const audioCategory = classToAudioCategory[currentFeedbackClass];
+        const audioCategory = classToAudioCategory[currentFeedbackClass];
 
-    // Play audio only when we detect an error class (not 'correct' or 'not_visible')
-    if (audioCategory && !isAudioPlaying && !isAudioOnCooldown) {
-      console.log(`🔊 AI detected: ${currentFeedbackClass} → Playing audio: ${audioCategory}`);
-      playAudioFromCategory(audioCategory);
-    }
-  }, [currentFeedbackClass, isExerciseActive, playAudioFromCategory, isAudioPlaying, isAudioOnCooldown]);
+        // Play audio only when we detect an error class (not 'correct' or 'not_visible')
+        if (audioCategory && !isAudioPlaying && !isAudioOnCooldown) {
+            console.log(`🔊 AI detected: ${currentFeedbackClass} → Playing audio: ${audioCategory}`);
+            playAudioFromCategory(audioCategory);
+        }
+    }, [currentFeedbackClass, isExerciseActive, playAudioFromCategory, isAudioPlaying, isAudioOnCooldown]);
 
 
-  const onResults = (results: Results) => {
+    const onResults = (results: Results) => {
         if (!canvasRef.current || !webcamRef.current || !webcamRef.current.video) return;
 
         // ✅ Check if we have landmarks AND model is ready before running inference
@@ -484,7 +493,7 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({
     // Cleanup on unmount
     useEffect(() => {
         return () => {
-          cleanupAudio(); // ✅ Clean up audio player
+            cleanupAudio(); // ✅ Clean up audio player
             console.log("Cleaning up PoseDetector...");
             if (webcamRef.current && webcamRef.current.video && webcamRef.current.video.srcObject) {
                 const stream = webcamRef.current.video.srcObject as MediaStream;
@@ -611,8 +620,8 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({
                         }}
                         disabled={evalStatus !== 'success'}
                         className={`relative w-full flex items-center justify-between px-6 py-4 rounded-2xl shadow-lg transition-all transform border overflow-hidden ${evalStatus === 'success'
-                                ? 'bg-green-500/20 text-green-100 border-green-400/30 shadow-green-500/10 cursor-pointer hover:scale-[1.02] active:scale-[0.98]'
-                                : 'bg-muted text-muted-foreground border-border cursor-not-allowed opacity-50'
+                            ? 'bg-green-500/20 text-green-100 border-green-400/30 shadow-green-500/10 cursor-pointer hover:scale-[1.02] active:scale-[0.98]'
+                            : 'bg-muted text-muted-foreground border-border cursor-not-allowed opacity-50'
                             }`}
                     >
                         {/* Progress Bar Background */}
