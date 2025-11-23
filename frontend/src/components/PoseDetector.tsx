@@ -373,20 +373,21 @@ const PoseDetector: React.FC<PoseDetectorProps> = ({
             // Only draw skeleton if exercise is active AND we are NOT counting down
             if (results.poseLandmarks && isExerciseActiveRef.current && !isCountingDownRef.current) {
 
+                // PROCESS EXERCISE
+                // Map MediaPipe landmarks to our simple interface (just x, y, z)
+                // Note: MediaPipe landmarks are normalized [0,1]
+                const processedState = processorRef.current.process(results.poseLandmarks);
+
                 // RECORD DATA
                 // Prefer poseWorldLandmarks for 3D, fallback to poseLandmarks
                 const frameData = results.poseWorldLandmarks || results.poseLandmarks;
                 if (frameData) {
                     currentRecordingRef.current.push({
                         timestamp: Date.now(),
-                        landmarks: frameData
+                        landmarks: frameData,
+                        badPoints: processedState.badPoints || [] // Save bad points
                     });
                 }
-
-                // PROCESS EXERCISE
-                // Map MediaPipe landmarks to our simple interface (just x, y, z)
-                // Note: MediaPipe landmarks are normalized [0,1]
-                const processedState = processorRef.current.process(results.poseLandmarks);
 
                 // Update state for UI (throttling might be needed for performance, but React handles it okay usually)
                 // We use a ref for immediate drawing, but state for UI

@@ -90,7 +90,7 @@ const FPSControls = () => {
 };
 
 // Component to render the skeleton for a single frame
-const Skeleton = ({ landmarks }: { landmarks: any[] }) => {
+const Skeleton = ({ landmarks, badPoints = [] }: { landmarks: any[], badPoints?: number[] }) => {
     if (!landmarks || landmarks.length === 0) return null;
 
     const VISIBILITY_THRESHOLD = 0.5;
@@ -120,10 +120,11 @@ const Skeleton = ({ landmarks }: { landmarks: any[] }) => {
                 const isVisible = (landmarks[i].visibility ?? 1) > VISIBILITY_THRESHOLD;
                 if (!isVisible) return null;
 
+                const isBad = badPoints.includes(i);
                 return (
                     <mesh key={i} position={pos}>
-                        <sphereGeometry args={[0.015, 16, 16]} />
-                        <meshStandardMaterial color="hotpink" />
+                        <sphereGeometry args={[isBad ? 0.025 : 0.015, 16, 16]} />
+                        <meshStandardMaterial color={isBad ? '#FF0000' : '#00FF00'} />
                     </mesh>
                 );
             })}
@@ -147,7 +148,7 @@ const Skeleton = ({ landmarks }: { landmarks: any[] }) => {
                 return (
                     <mesh key={`bone-${i}`} position={midPoint} quaternion={quaternion}>
                         <cylinderGeometry args={[0.01, 0.01, length, 8]} />
-                        <meshStandardMaterial color="cyan" />
+                        <meshStandardMaterial color="white" />
                     </mesh>
                 );
             })}
@@ -233,10 +234,11 @@ const ReplayScene = ({
     if (!currentFrame) return null;
 
     const landmarks = currentFrame.landmarks || currentFrame;
+    const badPoints = currentFrame.badPoints || [];
 
     return (
         <group position={[0, 1, 0]}>
-            <Skeleton landmarks={landmarks} />
+            <Skeleton landmarks={landmarks} badPoints={badPoints} />
         </group>
     );
 };
