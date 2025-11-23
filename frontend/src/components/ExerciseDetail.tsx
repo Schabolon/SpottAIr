@@ -7,12 +7,14 @@ import { toast } from "sonner";
 import PoseDetector from './PoseDetector';
 import AnalysisView from './AnalysisView';
 
-import { trainingSplit } from '../data/training-plan';
+import { useTrainingPlan } from '../context/TrainingPlanContext';
 
 const ExerciseDetail: React.FC = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const exerciseTitle = id ? id.charAt(0).toUpperCase() + id.slice(1) : 'Exercise';
+
+    const { trainingSplit, addExerciseToWorkout, updateTrainingSplit } = useTrainingPlan();
 
     // Find exercise to get target reps
     const exercise = Object.values(trainingSplit)
@@ -25,6 +27,7 @@ const ExerciseDetail: React.FC = () => {
     // State to store recorded pose data
     const [recordedData, setRecordedData] = React.useState<any[]>([]);
     const [analysisFeedback, setAnalysisFeedback] = React.useState<string | null>(null);
+    const [recommendation, setRecommendation] = React.useState<any | null>(null);
     const [activeTab, setActiveTab] = React.useState("train");
     const [isAnalyzing, setIsAnalyzing] = React.useState(false);
     const [currentSet, setCurrentSet] = React.useState(1);
@@ -49,8 +52,10 @@ const ExerciseDetail: React.FC = () => {
         }
     };
 
-    const handleAnalysisComplete = (feedback: string) => {
+    const handleAnalysisComplete = (feedback: string, rec?: any) => {
+        console.log("ExerciseDetail received recommendation:", rec);
         setAnalysisFeedback(feedback);
+        setRecommendation(rec);
         setIsAnalyzing(false);
         if (activeTab === 'train') {
             toast.success(feedback, {
@@ -58,6 +63,28 @@ const ExerciseDetail: React.FC = () => {
                 className: "bg-green-500 text-white border-none"
             });
         }
+    };
+
+    const handleAddToPlan = () => {
+        if (!recommendation) return;
+
+        // Find which workout this exercise belongs to
+        const workoutEntry = Object.entries(trainingSplit).find(([_, session]) =>
+            session.exercises.some(ex => ex.id === id)
+        );
+
+        const workoutKey = workoutEntry ? workoutEntry[0] : 'push'; // Default to push if not found
+
+        addExerciseToWorkout(workoutKey, {
+            title: recommendation.exercise,
+            sets: "3",
+            reps: "10-12",
+            muscle: "Targeted"
+        });
+
+        toast.success(`Added ${recommendation.exercise} to your plan!`, {
+            className: "bg-purple-500 text-white border-none"
+        });
     };
 
     return (
@@ -112,6 +139,15 @@ const ExerciseDetail: React.FC = () => {
                         recordedData={recordedData}
                         analysisFeedback={analysisFeedback}
                         isAnalyzing={isAnalyzing}
+                        recommendation={recommendation}
+                        onAddToPlan={handleAddToPlan}
+                        currentPlan={trainingSplit}
+                        onUpdatePlan={(newPlan, explanation) => {
+                            updateTrainingSplit(newPlan, explanation);
+                            toast.success("Training plan updated successfully! 🚀", {
+                                className: "bg-purple-500 text-white border-none"
+                            });
+                        }}
                     />
                 </TabsContent>
             </Tabs>

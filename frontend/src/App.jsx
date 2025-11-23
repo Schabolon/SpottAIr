@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { TrainingPlanProvider } from './context/TrainingPlanContext';
 import TrainingPlan from './components/TrainingPlan';
 import ExerciseDetail from './components/ExerciseDetail';
 import Layout from './components/Layout';
@@ -10,17 +11,19 @@ function App() {
   const [showWelcome, setShowWelcome] = useState(true);
 
   return (
-    <Router>
-      <div className="App">
-        {showWelcome && <WelcomeScreen onComplete={() => setShowWelcome(false)} />}
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<TrainingPlan />} />
-            <Route path="/exercise/:id" element={<ExerciseDetail />} />
-          </Route>
-        </Routes>
-      </div>
-    </Router>
+    <TrainingPlanProvider>
+      <Router>
+        <div className="App">
+          {showWelcome && <WelcomeScreen onComplete={() => setShowWelcome(false)} />}
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<TrainingPlan />} />
+              <Route path="/exercise/:id" element={<ExerciseDetail />} />
+            </Route>
+          </Routes>
+        </div>
+      </Router>
+    </TrainingPlanProvider>
   );
 }
 

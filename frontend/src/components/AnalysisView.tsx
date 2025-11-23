@@ -1,5 +1,6 @@
 import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Activity, Play, Pause, MousePointer2, Sparkles } from 'lucide-react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { PointerLockControls, Grid } from '@react-three/drei';
@@ -13,6 +14,14 @@ interface AnalysisViewProps {
     recordedData?: any[];
     analysisFeedback?: string | null;
     isAnalyzing?: boolean;
+    recommendation?: {
+        exercise: string;
+        reason: string;
+        difficulty: string;
+    } | null;
+    onAddToPlan?: () => void;
+    currentPlan?: any;
+    onUpdatePlan?: (newPlan: any, explanation: string) => void;
 }
 
 // FPS Movement Controls
@@ -243,10 +252,42 @@ const ReplayScene = ({
     );
 };
 
-const AnalysisView: React.FC<AnalysisViewProps> = ({ recordedData = [], analysisFeedback, isAnalyzing = false }) => {
+const AnalysisView: React.FC<AnalysisViewProps> = ({ recordedData = [], analysisFeedback, isAnalyzing = false, recommendation, onAddToPlan, currentPlan, onUpdatePlan }) => {
     const [isPlaying, setIsPlaying] = useState(true);
     const [sliderValue, setSliderValue] = useState(0);
     const [isScrubbing, setIsScrubbing] = useState(false);
+    const [showRec, setShowRec] = useState(false);
+    const [adjustmentExplanation, setAdjustmentExplanation] = useState<string | null>(null);
+    const [newPlan, setNewPlan] = useState<any | null>(null);
+    const [isAdjusting, setIsAdjusting] = useState(false);
+
+    useEffect(() => {
+        if (recommendation && currentPlan && !adjustmentExplanation && !isAdjusting) {
+            setShowRec(true);
+            setIsAdjusting(true);
+
+            // Call the new adjustment agent
+            fetch('/api/v1/adjust-plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    current_plan: currentPlan,
+                    workout_feedback: analysisFeedback || "General improvement needed.",
+                    exercise_name: recommendation.exercise // Using the rec exercise as context
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    setAdjustmentExplanation(data.explanation);
+                    setNewPlan(data.adjusted_plan);
+                    setIsAdjusting(false);
+                })
+                .catch(err => {
+                    console.error("Plan adjustment failed:", err);
+                    setIsAdjusting(false);
+                });
+        }
+    }, [recommendation, currentPlan]);
 
     const hasData = recordedData && recordedData.length > 0;
 
@@ -325,10 +366,10 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ recordedData = [], analysis
                         <div className="absolute top-4 left-4 z-10 flex gap-2 items-center">
                             <div className="bg-black/50 text-white px-3 py-2 rounded text-xs flex items-center gap-2">
                                 <MousePointer2 className="w-3 h-3" />
-                                <span>Click to Control</span>
-                                <span className="text-white/50">|</span>
-                                <span>WASD to Move</span>
-                                <span className="text-white/50">|</span>
+                                <span className="hidden sm:inline">Click to Control</span>
+                                <span className="text-white/50 hidden sm:inline">|</span>
+                                <span className="hidden sm:inline">WASD to Move</span>
+                                <span className="text-white/50 hidden sm:inline">|</span>
                                 <span>ESC to Exit</span>
                             </div>
                         </div>
@@ -393,6 +434,69 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ recordedData = [], analysis
                     </>
                 )}
             </Card>
+
+            {/* Recommendation Popup */}
+            <Dialog open={showRec} onOpenChange={setShowRec}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 text-purple-500" />
+                            Smart Training Adjustment
+                        </DialogTitle>
+                        <DialogDescription>
+                            Based on your recent set, we recommend adding this exercise to your plan.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {isAdjusting ? (
+                        <div className="flex flex-col items-center justify-center py-8 gap-4">
+                            <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                            <p className="text-sm text-muted-foreground">Optimizing your training plan...</p>
+                        </div>
+                    ) : adjustmentExplanation ? (
+                        <div className="flex flex-col gap-4 py-4">
+                            <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                                <h3 className="font-bold text-lg text-purple-600 mb-2">Proposed Changes</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    {adjustmentExplanation}
+                                </p>
+                            </div>
+                        </div>
+                    ) : recommendation && (
+                        <div className="flex flex-col gap-4 py-4">
+                            {/* Fallback to old view if something fails */}
+                            <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                                <h3 className="font-bold text-lg text-purple-600 mb-1">{recommendation.exercise}</h3>
+                                <div className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-200 text-purple-800 w-fit mb-2">
+                                    {recommendation.difficulty}
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                    {recommendation.reason}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter className="sm:justify-start">
+                        <Button type="button" variant="secondary" onClick={() => setShowRec(false)}>
+                            Close
+                        </Button>
+                        {newPlan ? (
+                            <Button type="button" className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => {
+                                if (onUpdatePlan && adjustmentExplanation) onUpdatePlan(newPlan, adjustmentExplanation);
+                                setShowRec(false);
+                            }}>
+                                Apply Changes
+                            </Button>
+                        ) : (
+                            <Button type="button" className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => {
+                                if (onAddToPlan) onAddToPlan();
+                                setShowRec(false);
+                            }}>
+                                Add Single Exercise
+                            </Button>
+                        )}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };
