@@ -7,7 +7,7 @@ import WelcomeScreen from './components/WelcomeScreen';
 import './App.css';
 
 function App() {
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false); // Disabled for development
 
   return (
     <Router>

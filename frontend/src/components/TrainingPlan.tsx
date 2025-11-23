@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import {
     ChevronRight, PlayCircle, Layers, Hash, Repeat, Circle, Dumbbell,
     Footprints, ArrowUp, ArrowDown, Activity, Shield, MoveVertical, Grab,
-    ArrowUpFromLine, ArrowDownToLine, Plus
+    ArrowUpFromLine, ArrowDownToLine, Plus, Sparkles
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -300,77 +300,102 @@ const TrainingPlan: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="hover:bg-transparent border-b border-border/50">
-                                        <TableHead className="w-[400px] h-10">
-                                            <div className="flex items-center gap-2 text-muted-foreground">
-                                                <Layers className="w-4 h-4" />
-                                                Exercise
-                                            </div>
-                                        </TableHead>
-                                        <TableHead className="h-10">
-                                            <div className="flex items-center gap-2 text-muted-foreground">
-                                                <Circle className="w-4 h-4" />
-                                                Target Muscle
-                                            </div>
-                                        </TableHead>
-                                        <TableHead className="h-10">
-                                            <div className="flex items-center gap-2 text-muted-foreground">
-                                                <Hash className="w-4 h-4" />
-                                                Sets
-                                            </div>
-                                        </TableHead>
-                                        <TableHead className="h-10">
-                                            <div className="flex items-center gap-2 text-muted-foreground">
-                                                <Repeat className="w-4 h-4" />
-                                                Reps
-                                            </div>
-                                        </TableHead>
-                                        <TableHead className="text-right h-10">Action</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {session.exercises.map((exercise) => (
-                                        <TableRow
-                                            key={exercise.id}
-                                            className="cursor-pointer hover:bg-muted/50 transition-colors group border-b border-border/50"
-                                            onClick={() => navigate(`/exercise/${exercise.id}`)}
-                                        >
-                                            <TableCell className="font-medium py-4">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-muted shrink-0 text-muted-foreground">
-                                                        <exercise.icon className="w-5 h-5" />
-                                                    </div>
-                                                    <span className="text-base">{exercise.title}</span>
+                        <div className="flex flex-col lg:flex-row gap-6">
+                            <div className="flex-1 rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="hover:bg-transparent border-b border-border/50">
+                                            <TableHead className="w-[400px] h-10">
+                                                <div className="flex items-center gap-2 text-muted-foreground">
+                                                    <Layers className="w-4 h-4" />
+                                                    Exercise
                                                 </div>
-                                            </TableCell>
-                                            <TableCell className="py-4">
-                                                <Badge variant="secondary" className={`font-normal rounded-sm px-2 py-1 text-xs gap-1.5 ${getMuscleColor(exercise.muscle)}`}>
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                                                    {exercise.muscle}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="py-4">
-                                                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                                                    {exercise.sets}
+                                            </TableHead>
+                                            <TableHead className="h-10">
+                                                <div className="flex items-center gap-2 text-muted-foreground">
+                                                    <Circle className="w-4 h-4" />
+                                                    Target Muscle
                                                 </div>
-                                            </TableCell>
-                                            <TableCell className="py-4">
-                                                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                                                    {exercise.reps}
+                                            </TableHead>
+                                            <TableHead className="h-10">
+                                                <div className="flex items-center gap-2 text-muted-foreground">
+                                                    <Hash className="w-4 h-4" />
+                                                    Sets
                                                 </div>
-                                            </TableCell>
-                                            <TableCell className="text-right py-4">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <ChevronRight className="w-4 h-4" />
-                                                </Button>
-                                            </TableCell>
+                                            </TableHead>
+                                            <TableHead className="h-10">
+                                                <div className="flex items-center gap-2 text-muted-foreground">
+                                                    <Repeat className="w-4 h-4" />
+                                                    Reps
+                                                </div>
+                                            </TableHead>
+                                            <TableHead className="text-right h-10">Action</TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {session.exercises.map((exercise) => (
+                                            <TableRow
+                                                key={exercise.id}
+                                                className="cursor-pointer hover:bg-muted/50 transition-colors group border-b border-border/50"
+                                                onClick={() => navigate(`/exercise/${exercise.id}`)}
+                                            >
+                                                <TableCell className="font-medium py-4">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-muted shrink-0 text-muted-foreground">
+                                                            <exercise.icon className="w-5 h-5" />
+                                                        </div>
+                                                        <span className="text-base">{exercise.title}</span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="py-4">
+                                                    <Badge variant="secondary" className={`font-normal rounded-sm px-2 py-1 text-xs gap-1.5 ${getMuscleColor(exercise.muscle)}`}>
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
+                                                        {exercise.muscle}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="py-4">
+                                                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                                                        {exercise.sets}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="py-4">
+                                                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                                                        {exercise.reps}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-right py-4">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <ChevronRight className="w-4 h-4" />
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            {/* AI Status Panel */}
+                            <div className="w-full lg:w-[320px]">
+                                <div className="rounded-3xl border shadow-sm p-6 flex flex-col bg-purple-500/10 border-purple-500/20 h-full min-h-[300px]">
+                                    <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
+                                        <Sparkles className="w-4 h-4 text-purple-500 fill-purple-500/20" />
+                                        <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                                            AI Agent Active
+                                        </span>
+                                    </h2>
+                                    <div className="flex-1 flex flex-col items-center justify-center text-center gap-4">
+                                        <div className="w-16 h-16 rounded-full bg-purple-500/10 flex items-center justify-center animate-pulse">
+                                            <Sparkles className="w-8 h-8 text-purple-500" />
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-purple-900 dark:text-purple-100">Plan Optimized</p>
+                                            <p className="text-sm text-muted-foreground mt-1">
+                                                Your training split has been adjusted based on your recent performance and recovery data.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </TabsContent>
                 ))}

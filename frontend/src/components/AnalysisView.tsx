@@ -1,6 +1,6 @@
 import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Play, Pause, MousePointer2 } from 'lucide-react';
+import { Activity, Play, Pause, MousePointer2, Sparkles } from 'lucide-react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { PointerLockControls, Grid } from '@react-three/drei';
 import { Button } from "@/components/ui/button";
@@ -261,122 +261,136 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ recordedData = [], analysis
     };
 
     return (
-        <div className="space-y-6">
-            {/* ... (stats cards remain same) ... */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Frames</CardTitle>
-                        <Activity className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{recordedData.length}</div>
-                        <p className="text-xs text-muted-foreground">Recorded data points</p>
-                    </CardContent>
-                </Card>
-                {/* ... other cards ... */}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* 3D Viewer - Resized and spanning 2 columns */}
-                <Card className="lg:col-span-2 h-[400px] bg-black/90 overflow-hidden relative flex flex-col">
-                    {/* ... (viewer content remains same) ... */}
-                    {!hasData ? (
-                        <div className="flex items-center justify-center h-full text-muted-foreground">
-                            <p>No recording available. Complete an exercise to see 3D replay.</p>
-                        </div>
-                    ) : (
-                        <>
-                            <div className="absolute top-4 left-4 z-10 flex gap-2 items-center">
-                                <Button
-                                    variant="secondary"
-                                    size="icon"
-                                    onClick={() => setIsPlaying(!isPlaying)}
-                                >
-                                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                                </Button>
-                                <div className="bg-black/50 text-white px-3 py-2 rounded text-xs flex items-center gap-2">
-                                    <MousePointer2 className="w-3 h-3" />
-                                    <span>Click to Control</span>
-                                    <span className="text-white/50">|</span>
-                                    <span>WASD to Move</span>
-                                    <span className="text-white/50">|</span>
-                                    <span>ESC to Exit</span>
-                                </div>
-                            </div>
-
-                            {/* Timeline Controls */}
-                            <div className="absolute bottom-4 left-4 right-4 z-10 bg-black/60 p-4 rounded-lg backdrop-blur-sm flex items-center gap-4">
-                                <span className="text-white font-mono text-sm w-16 text-right">
-                                    {formatTime(sliderValue)}
-                                </span>
-                                <Slider
-                                    value={[sliderValue]}
-                                    max={duration || 100}
-                                    step={10}
-                                    className="flex-1"
-                                    onValueChange={(vals) => {
-                                        setIsScrubbing(true);
-                                        setSliderValue(vals[0]);
-                                        setIsPlaying(false); // Pause while scrubbing
-                                    }}
-                                    onValueCommit={() => {
-                                        setIsScrubbing(false);
-                                    }}
-                                />
-                                <span className="text-white/50 font-mono text-sm w-16">
-                                    {formatTime(duration)}
-                                </span>
-                            </div>
-
-                            <Canvas camera={{ position: [0, 1.5, 4], fov: 50 }}>
-                                <color attach="background" args={['#111']} />
-                                <ambientLight intensity={0.5} />
-                                <directionalLight position={[10, 10, 5]} intensity={1} />
-
-                                <ReplayScene
-                                    data={recordedData}
-                                    isPlaying={isPlaying}
-                                    manualTime={isScrubbing ? sliderValue : null}
-                                    onTimeUpdate={(t) => {
-                                        if (!isScrubbing) setSliderValue(t);
-                                    }}
-                                />
-
-                                <Grid infiniteGrid fadeDistance={30} sectionColor="#444" cellColor="#222" />
-
-                                <FPSControls />
-                                <PointerLockControls />
-                            </Canvas>
-                        </>
-                    )}
-                </Card>
-
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-230px)]">
+            {/* Left Column: AI Feedback + Stats */}
+            <div className="lg:col-span-1 flex flex-col gap-6 h-full">
                 {/* AI Feedback Panel */}
-                <Card className="h-[400px] flex flex-col">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <span>🤖</span> AI Coach Feedback
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex-1 overflow-y-auto custom-scrollbar">
-                        {isAnalyzing ? (
-                            <div className="h-full flex flex-col items-center justify-center gap-4">
-                                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                                <p className="text-sm text-muted-foreground animate-pulse">Analyzing your form...</p>
-                            </div>
-                        ) : analysisFeedback ? (
-                            <div className="prose dark:prose-invert max-w-none text-sm">
-                                <ReactMarkdown>{analysisFeedback}</ReactMarkdown>
-                            </div>
-                        ) : (
-                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-center p-4">
-                                <p>Complete a set to receive personalized AI coaching.</p>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                <div className="flex-1 min-h-0">
+                    <div className="h-full backdrop-blur-sm rounded-3xl border shadow-sm p-6 flex flex-col bg-purple-500/10 border-purple-500/20">
+                        <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-purple-500 fill-purple-500/20" />
+                            <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                                AI Coach Feedback
+                            </span>
+                        </h2>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                            {isAnalyzing ? (
+                                <div className="h-full flex flex-col items-center justify-center gap-4">
+                                    <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                                    <p className="text-sm text-muted-foreground animate-pulse">Analyzing your form...</p>
+                                </div>
+                            ) : analysisFeedback ? (
+                                <div className="prose dark:prose-invert max-w-none text-sm">
+                                    <ReactMarkdown>{analysisFeedback}</ReactMarkdown>
+                                </div>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50 gap-4 text-center">
+                                    <div className="w-16 h-16 rounded-full bg-purple-500/10 flex items-center justify-center">
+                                        <Sparkles className="w-8 h-8 text-purple-500" />
+                                    </div>
+                                    <p>Complete a set to receive<br />personalized AI coaching.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Stats Cards - Stacked Vertically */}
+                <div className="grid grid-cols-1 gap-4 shrink-0">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Total Frames</CardTitle>
+                            <Activity className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{recordedData.length}</div>
+                            <p className="text-xs text-muted-foreground">Recorded data points</p>
+                        </CardContent>
+                    </Card>
+                    {/* Add more stats cards here if needed, or keep it simple */}
+                </div>
             </div>
+
+            {/* Right Column: 3D Viewer - Full Height */}
+            <Card className="lg:col-span-2 h-full bg-black/90 overflow-hidden relative flex flex-col rounded-3xl border-0 ring-1 ring-white/10 shadow-2xl">
+                {/* ... (viewer content remains same) ... */}
+                {!hasData ? (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                        <p>No recording available. Complete an exercise to see 3D replay.</p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="absolute top-4 left-4 z-10 flex gap-2 items-center">
+                            <div className="bg-black/50 text-white px-3 py-2 rounded text-xs flex items-center gap-2">
+                                <MousePointer2 className="w-3 h-3" />
+                                <span>Click to Control</span>
+                                <span className="text-white/50">|</span>
+                                <span>WASD to Move</span>
+                                <span className="text-white/50">|</span>
+                                <span>ESC to Exit</span>
+                            </div>
+                        </div>
+
+                        {/* Timeline Controls */}
+                        <div
+                            className="absolute bottom-4 left-4 right-4 z-10 bg-black/60 p-4 rounded-lg backdrop-blur-sm flex items-center gap-4"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onMouseUp={(e) => e.stopPropagation()}
+                        >
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-white hover:text-white hover:bg-white/20 h-8 w-8"
+                                onClick={() => setIsPlaying(!isPlaying)}
+                            >
+                                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                            </Button>
+                            <span className="text-white font-mono text-sm w-16 text-right">
+                                {formatTime(sliderValue)}
+                            </span>
+                            <Slider
+                                value={[sliderValue]}
+                                max={duration || 100}
+                                step={10}
+                                className="flex-1"
+                                onValueChange={(vals) => {
+                                    setIsScrubbing(true);
+                                    setSliderValue(vals[0]);
+                                    setIsPlaying(false); // Pause while scrubbing
+                                }}
+                                onValueCommit={() => {
+                                    setIsScrubbing(false);
+                                }}
+                            />
+                            <span className="text-white/50 font-mono text-sm w-16">
+                                {formatTime(duration)}
+                            </span>
+                        </div>
+
+                        <Canvas camera={{ position: [0, 1.5, 4], fov: 50 }}>
+                            <color attach="background" args={['#111']} />
+                            <ambientLight intensity={0.5} />
+                            <directionalLight position={[10, 10, 5]} intensity={1} />
+
+                            <ReplayScene
+                                data={recordedData}
+                                isPlaying={isPlaying}
+                                manualTime={isScrubbing ? sliderValue : null}
+                                onTimeUpdate={(t) => {
+                                    if (!isScrubbing) setSliderValue(t);
+                                }}
+                            />
+
+                            <Grid infiniteGrid fadeDistance={30} sectionColor="#444" cellColor="#222" />
+
+                            <FPSControls />
+                            <PointerLockControls />
+                        </Canvas>
+                    </>
+                )}
+            </Card>
         </div>
     );
 };
